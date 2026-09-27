@@ -1,6 +1,9 @@
 <?php
 
-use Illuminate\Http\Request;
+use App\Http\Controllers\Api\V1\AudioJobController;
+use App\Http\Controllers\Api\V1\AuthController;
+use App\Http\Controllers\Api\V1\CreditController;
+use App\Http\Controllers\Api\V1\LicenseController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -22,15 +25,20 @@ Route::prefix('v1')->group(function () {
         ]);
     });
 
-    // Auth (to be implemented): login, logout, license check
-    // Route::post('/login', ...);
-    // Route::middleware('auth:sanctum')->group(function () {
-    //     Route::get('/me', ...);
-    //     Route::get('/license', ...);
-    //     Route::post('/logout', ...);
-    // });
+    Route::post('/register', [AuthController::class, 'register']);
+    Route::post('/login', [AuthController::class, 'login']);
 
-    Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
-        return $request->user();
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::get('/me', [AuthController::class, 'me']);
+        Route::get('/license', [LicenseController::class, 'show']);
+        Route::post('/license/activate-test', [LicenseController::class, 'activateTest']);
+        Route::post('/license/revoke', [LicenseController::class, 'revoke']);
+        Route::get('/credits', [CreditController::class, 'index']);
+        Route::post('/credits/consume', [CreditController::class, 'consume']);
+        Route::post('/credits/purchase-test', [CreditController::class, 'purchaseTest']);
+        Route::post('/audio/jobs', [AudioJobController::class, 'store']);
+        Route::get('/audio/jobs/{uuid}', [AudioJobController::class, 'show']);
+        Route::get('/audio/jobs/{uuid}/result', [AudioJobController::class, 'result']);
+        Route::post('/logout', [AuthController::class, 'logout']);
     });
 });
