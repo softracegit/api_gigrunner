@@ -286,6 +286,54 @@
             responseBox.textContent = '{}';
         });
 
+        function responseText() {
+            return (responseBox.textContent || '').trim() || '{}';
+        }
+
+        function prettyJsonText() {
+            const raw = responseText();
+            try {
+                return JSON.stringify(JSON.parse(raw), null, 2);
+            } catch (e) {
+                return raw;
+            }
+        }
+
+        document.getElementById('btnCopyResponse').addEventListener('click', async function () {
+            const text = prettyJsonText();
+            try {
+                await navigator.clipboard.writeText(text);
+                statusLine.className = 'status-line ok';
+                statusLine.textContent = i18n.copied;
+            } catch (e) {
+                statusLine.className = 'status-line err';
+                statusLine.textContent = i18n.copyFailed;
+            }
+        });
+
+        document.getElementById('btnSaveResponse').addEventListener('click', function () {
+            const text = prettyJsonText();
+            if (!text || text === '{}') {
+                statusLine.className = 'status-line err';
+                statusLine.textContent = i18n.nothingToSave;
+                return;
+            }
+
+            const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const blob = new Blob([text], { type: 'application/json;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'gigrunner-response-' + stamp + '.json';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+
+            statusLine.className = 'status-line ok';
+            statusLine.textContent = i18n.saved;
+        });
+
         renderToken();
     })();
 </script>

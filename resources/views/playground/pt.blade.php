@@ -126,8 +126,25 @@
 
     <aside class="pg-col pg-col-response" id="pgColResponse">
         <div class="pg-response-head">
-            <h2>Resposta</h2>
-            <div id="statusLine" class="status-line" style="margin: 0;">Pronto.</div>
+            <div class="pg-response-title">
+                <h2>Resposta</h2>
+                <div id="statusLine" class="status-line" style="margin: 0;">Pronto.</div>
+            </div>
+            <div class="pg-response-actions">
+                <button type="button" class="pg-icon-btn" id="btnCopyResponse" title="Copiar" aria-label="Copiar">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <rect x="9" y="9" width="13" height="13" rx="2"/>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                    </svg>
+                </button>
+                <button type="button" class="pg-icon-btn" id="btnSaveResponse" title="Guardar JSON" aria-label="Guardar JSON">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <path d="M7 10l5 5 5-5"/>
+                        <path d="M12 15V3"/>
+                    </svg>
+                </button>
+            </div>
         </div>
         <div class="code-box">
             <pre id="responseBox">{}</pre>
@@ -145,5 +162,9 @@
         'tokenCleared' => 'Token limpo.',
         'ready' => 'Pronto.',
         'uploading' => 'POST /audio/jobs (upload) …',
+        'copied' => 'Copiado.',
+        'copyFailed' => 'Não foi possível copiar.',
+        'saved' => 'JSON guardado.',
+        'nothingToSave' => 'Nada para guardar.',
     ],
 ])

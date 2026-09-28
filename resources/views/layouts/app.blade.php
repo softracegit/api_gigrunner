@@ -604,17 +604,50 @@
         }
         .pg-response-head {
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             justify-content: space-between;
             gap: 12px;
             padding: 10px 14px;
             border-bottom: 1px solid var(--border);
             flex: 0 0 auto;
         }
+        .pg-response-title {
+            min-width: 0;
+            flex: 1;
+        }
         .pg-response-head h2 {
-            margin: 0;
+            margin: 0 0 4px;
             font-size: 0.85rem;
             font-weight: 650;
+        }
+        .pg-response-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            flex-shrink: 0;
+        }
+        .pg-icon-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            padding: 0;
+            border: 1px solid var(--border);
+            border-radius: 7px;
+            background: transparent;
+            color: var(--muted);
+            cursor: pointer;
+        }
+        .pg-icon-btn:hover {
+            color: var(--text);
+            background: var(--hover);
+            border-color: var(--muted);
+        }
+        .pg-icon-btn svg {
+            width: 14px;
+            height: 14px;
+            display: block;
         }
         .pg-col-response .code-box {
             margin: 0;
