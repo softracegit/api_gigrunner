@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\License;
 use App\Models\User;
+use App\Services\CreditService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -13,6 +14,8 @@ use Illuminate\View\View;
 
 class AuthController extends Controller
 {
+    public function __construct(private CreditService $credits) {}
+
     public function showRegister(): View
     {
         return view('auth.register');
@@ -63,6 +66,7 @@ class AuthController extends Controller
         return view('auth.account', [
             'user' => $user,
             'license' => $user->currentLicense(),
+            'credits' => $this->credits->balances($user),
         ]);
     }
 

@@ -35,6 +35,8 @@ return [
     'account_title' => 'Your account',
     'account_sub' => 'Customer web area: view details and simulate licence purchase/activation.',
     'account_name' => 'Name',
+    'account_credits' => 'Credits',
+    'account_credits_sub' => 'Balance available for AI actions (consumed by the app via the API).',
     'account_license' => 'Licence',
     'account_license_sub' => 'In the future this activates with payment. For now you can simulate it.',
     'account_valid' => 'Valid',

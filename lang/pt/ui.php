@@ -35,6 +35,8 @@ return [
     'account_title' => 'A tua conta',
     'account_sub' => 'Área web do cliente: ver dados e simular compra/activação de licença.',
     'account_name' => 'Nome',
+    'account_credits' => 'Créditos',
+    'account_credits_sub' => 'Saldo disponível para acções AI (consumo feito pela app via API).',
     'account_license' => 'Licença',
     'account_license_sub' => 'No futuro isto activa-se com pagamento. Agora podes simular.',
     'account_valid' => 'Válida',

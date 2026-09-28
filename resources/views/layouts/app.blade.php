@@ -408,13 +408,15 @@
             .grid-2 { grid-template-columns: 1fr 1fr; }
         }
 
-        html, body.shell-page {
-            height: 100%;
-            overflow: hidden;
-        }
         body.shell-page {
+            height: 100vh;
+            overflow: hidden;
             display: flex;
             flex-direction: column;
+        }
+        html:has(body.shell-page) {
+            height: 100%;
+            overflow: hidden;
         }
         body.shell-page .topnav {
             position: static;
@@ -662,7 +664,8 @@
         .pg-actions .btn { width: 100%; }
 
         @media (max-width: 860px) {
-            html, body.shell-page { height: auto; overflow: auto; }
+            html:has(body.shell-page),
+            body.shell-page { height: auto; overflow: auto; }
             body.shell-page { display: block; }
             .wrap.shell { overflow: visible; display: block; }
             .docs-shell { grid-template-columns: 1fr; overflow: visible; }

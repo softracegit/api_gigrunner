@@ -21,6 +21,26 @@
     </div>
 
     <div class="card">
+        <h2 style="margin-top: 0; font-size: 1.1rem;">{{ __('ui.account_credits') }}</h2>
+        <p class="sub" style="margin-bottom: 16px;">{{ __('ui.account_credits_sub') }}</p>
+        <div class="meta">
+            @forelse ($credits as $type => $balance)
+                <div class="meta-row">
+                    <span>{{ strtoupper($type) }}</span>
+                    <div style="font-weight: 650; font-size: 1.15rem; color: {{ $balance > 0 ? 'var(--ok)' : 'var(--muted)' }};">
+                        {{ number_format($balance, 0, ',', ' ') }}
+                    </div>
+                </div>
+            @empty
+                <div class="meta-row">
+                    <span>AI</span>
+                    <div style="font-weight: 650; color: var(--muted);">0</div>
+                </div>
+            @endforelse
+        </div>
+    </div>
+
+    <div class="card">
         <h2 style="margin-top: 0; font-size: 1.1rem;">{{ __('ui.account_license') }}</h2>
         <p class="sub" style="margin-bottom: 16px;">{{ __('ui.account_license_sub') }}</p>
 
