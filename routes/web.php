@@ -1,7 +1,18 @@
 <?php
 
 use App\Http\Controllers\Web\AuthController;
+use App\Http\Middleware\SetLocale;
 use Illuminate\Support\Facades\Route;
+
+Route::get('/locale/{locale}', function (string $locale) {
+    if (! in_array($locale, SetLocale::SUPPORTED, true)) {
+        abort(404);
+    }
+
+    session(['locale' => $locale]);
+
+    return redirect()->back();
+})->name('locale.switch');
 
 Route::get('/', fn () => view('home'))->name('home');
 Route::get('/docs', fn () => view('docs'))->name('docs');

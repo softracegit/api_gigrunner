@@ -1,10 +1,10 @@
 @extends('layouts.app')
 
-@section('title', 'Registo — GigRunner')
+@section('title', __('ui.nav_register').' — GigRunner')
 
 @section('content')
-    <h1>Criar conta</h1>
-    <p class="sub">Registo de teste. A mesma conta serve para a API e para esta web.</p>
+    <h1>{{ __('ui.register_title') }}</h1>
+    <p class="sub">{{ __('ui.register_sub') }}</p>
 
     <div class="card">
         @if ($errors->any())
@@ -20,7 +20,7 @@
         <form method="POST" action="{{ route('register') }}">
             @csrf
             <div class="field">
-                <label for="name">Nome</label>
+                <label for="name">{{ __('ui.register_name') }}</label>
                 <input id="name" type="text" name="name" value="{{ old('name') }}" required autofocus>
             </div>
             <div class="field">
@@ -32,14 +32,14 @@
                 <input id="password" type="password" name="password" required>
             </div>
             <div class="field">
-                <label for="password_confirmation">Confirmar password</label>
+                <label for="password_confirmation">{{ __('ui.register_password_confirm') }}</label>
                 <input id="password_confirmation" type="password" name="password_confirmation" required>
             </div>
             <div class="actions">
-                <button class="btn" type="submit">Registar</button>
+                <button class="btn" type="submit">{{ __('ui.register_submit') }}</button>
             </div>
         </form>
     </div>
 
-    <p class="links">Já tens conta? <a href="{{ route('login') }}">Login</a></p>
+    <p class="links">{{ __('ui.register_has_account') }} <a href="{{ route('login') }}">{{ __('ui.nav_login') }}</a></p>
 @endsection

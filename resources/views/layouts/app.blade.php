@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -62,6 +62,35 @@
         }
         .topnav a.nav:hover { color: var(--text); background: #222b36; }
         .topnav a.nav.active { color: var(--text); background: #243040; }
+        .topnav .nav-right {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 6px 12px;
+        }
+        .lang-switch {
+            display: inline-flex;
+            align-items: center;
+            gap: 2px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 2px;
+            background: #121820;
+        }
+        .lang-switch a {
+            color: var(--muted);
+            text-decoration: none;
+            font-size: 0.78rem;
+            font-weight: 650;
+            letter-spacing: 0.04em;
+            padding: 5px 9px;
+            border-radius: 6px;
+        }
+        .lang-switch a:hover { color: var(--text); }
+        .lang-switch a.active {
+            color: var(--text);
+            background: #243040;
+        }
         .wrap {
             max-width: 440px;
             margin: 0 auto;
@@ -543,15 +572,21 @@
 <body class="@yield('body_class')">
     <nav class="topnav">
         <a class="logo" href="{{ route('home') }}">GigRunner API</a>
-        <div class="nav-links">
-            <a class="nav {{ request()->routeIs('docs') ? 'active' : '' }}" href="{{ route('docs') }}">Docs</a>
-            <a class="nav {{ request()->routeIs('playground') ? 'active' : '' }}" href="{{ route('playground') }}">Playground</a>
-            @auth
-                <a class="nav {{ request()->routeIs('account') ? 'active' : '' }}" href="{{ route('account') }}">Conta</a>
-            @else
-                <a class="nav {{ request()->routeIs('login') ? 'active' : '' }}" href="{{ route('login') }}">Login</a>
-                <a class="nav {{ request()->routeIs('register') ? 'active' : '' }}" href="{{ route('register') }}">Registo</a>
-            @endauth
+        <div class="nav-right">
+            <div class="nav-links">
+                <a class="nav {{ request()->routeIs('docs') ? 'active' : '' }}" href="{{ route('docs') }}">{{ __('ui.nav_docs') }}</a>
+                <a class="nav {{ request()->routeIs('playground') ? 'active' : '' }}" href="{{ route('playground') }}">{{ __('ui.nav_playground') }}</a>
+                @auth
+                    <a class="nav {{ request()->routeIs('account') ? 'active' : '' }}" href="{{ route('account') }}">{{ __('ui.nav_account') }}</a>
+                @else
+                    <a class="nav {{ request()->routeIs('login') ? 'active' : '' }}" href="{{ route('login') }}">{{ __('ui.nav_login') }}</a>
+                    <a class="nav {{ request()->routeIs('register') ? 'active' : '' }}" href="{{ route('register') }}">{{ __('ui.nav_register') }}</a>
+                @endauth
+            </div>
+            <div class="lang-switch" aria-label="Language">
+                <a href="{{ route('locale.switch', 'pt') }}" class="{{ app()->getLocale() === 'pt' ? 'active' : '' }}">PT</a>
+                <a href="{{ route('locale.switch', 'en') }}" class="{{ app()->getLocale() === 'en' ? 'active' : '' }}">EN</a>
+            </div>
         </div>
     </nav>
     <div class="wrap @yield('wrap_class')">

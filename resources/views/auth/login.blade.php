@@ -1,10 +1,10 @@
 @extends('layouts.app')
 
-@section('title', 'Login — GigRunner')
+@section('title', __('ui.login_title').' — GigRunner')
 
 @section('content')
-    <h1>Login</h1>
-    <p class="sub">Entra para ver a conta e gerar um token API de teste.</p>
+    <h1>{{ __('ui.login_title') }}</h1>
+    <p class="sub">{{ __('ui.login_sub') }}</p>
 
     <div class="card">
         @if ($errors->any())
@@ -29,13 +29,13 @@
             </div>
             <label class="check">
                 <input type="checkbox" name="remember" value="1">
-                Manter sessão
+                {{ __('ui.login_remember') }}
             </label>
             <div class="actions">
-                <button class="btn" type="submit">Entrar</button>
+                <button class="btn" type="submit">{{ __('ui.login_submit') }}</button>
             </div>
         </form>
     </div>
 
-    <p class="links">Ainda sem conta? <a href="{{ route('register') }}">Registar</a></p>
+    <p class="links">{{ __('ui.login_no_account') }} <a href="{{ route('register') }}">{{ __('ui.login_register_link') }}</a></p>
 @endsection
