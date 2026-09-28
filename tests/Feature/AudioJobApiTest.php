@@ -41,6 +41,10 @@ class AudioJobApiTest extends TestCase
                 'key' => 'C',
                 'segments' => [
                     ['label' => 'C', 'start' => 0, 'end' => 2, 'confidence' => 1],
+                    ['label' => 'Am', 'start' => 2, 'end' => 4, 'confidence' => 1],
+                ],
+                'words' => [
+                    ['word' => 'Hello', 'start' => 0.5, 'end' => 1.0],
                 ],
             ], 200),
         ]);
@@ -70,8 +74,16 @@ class AudioJobApiTest extends TestCase
             'Authorization' => 'Bearer '.$token,
         ])->assertOk()
             ->assertJsonPath('job.status', 'complete')
-            ->assertJsonPath('result.tempo', 120)
-            ->assertJsonPath('result.key', 'C');
+            ->assertJsonPath('result.format', 1)
+            ->assertJsonPath('result.meta.bpm', 120)
+            ->assertJsonPath('result.meta.key', 'C')
+            ->assertJsonPath('result.cues.0.kind', 'chord')
+            ->assertJsonPath('result.cues.0.name', 'C')
+            ->assertJsonPath('result.cues.0.timeMs', 0)
+            ->assertJsonPath('result.cues.0.durationMs', 2000)
+            ->assertJsonPath('result.cues.0.channel', 1)
+            ->assertJsonPath('result.cues.1.name', 'Hello')
+            ->assertJsonPath('result.cues.1.kind', 'lyric');
     }
 
     public function test_rejects_without_license(): void

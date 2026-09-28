@@ -15,6 +15,7 @@ class AudioJobService
     public function __construct(
         private MagicChordsClient $magicChords,
         private CreditService $credits,
+        private SongResultNormalizer $normalizer,
     ) {}
 
     public function createFromUpload(User $user, UploadedFile $file, string $kind): AudioJob
@@ -101,7 +102,11 @@ class AudioJobService
 
     public function refresh(AudioJob $job): AudioJob
     {
-        if (in_array($job->status, [AudioJob::STATUS_COMPLETE, AudioJob::STATUS_FAILED], true)) {
+        if ($job->status === AudioJob::STATUS_COMPLETE) {
+            return $this->ensureCompletePresentation($job);
+        }
+
+        if ($job->status === AudioJob::STATUS_FAILED) {
             return $job;
         }
 
@@ -116,16 +121,19 @@ class AudioJobService
             $job->progress = isset($status['progress_percentage'])
                 ? (int) round((float) $status['progress_percentage'])
                 : $job->progress;
-            $job->message = $status['message'] ?? $job->message;
 
-            if ($mapped === AudioJob::STATUS_COMPLETE && empty($job->result)) {
-                $job->result = $this->magicChords->result($job->external_job_id);
+            if ($mapped === AudioJob::STATUS_COMPLETE) {
+                if (empty($job->result)) {
+                    $raw = $this->magicChords->result($job->external_job_id);
+                    $job->result = $this->normalizedResult($job, $raw);
+                }
                 $job->progress = 100;
-                $job->message = $job->message ?: 'Concluído';
-            }
-
-            if ($mapped === AudioJob::STATUS_FAILED) {
+                $job->message = 'Concluído';
+            } elseif ($mapped === AudioJob::STATUS_FAILED) {
                 $job->error = $status['message'] ?? 'Job falhou no provider.';
+                $job->message = $status['message'] ?? 'Falhou';
+            } else {
+                $job->message = $status['message'] ?? $job->message;
             }
 
             $job->save();
@@ -133,6 +141,28 @@ class AudioJobService
             $job->message = 'Erro ao consultar provider: '.$e->getMessage();
             $job->save();
         }
+
+        return $job->fresh();
+    }
+
+    /**
+     * Jobs already marked complete may still have a stale in-progress message.
+     */
+    private function ensureCompletePresentation(AudioJob $job): AudioJob
+    {
+        $needsFix = $job->progress < 100
+            || $job->message === null
+            || $job->message === ''
+            || preg_match('/\d+\s*%/', (string) $job->message) === 1
+            || preg_match('/detecting|processing|queued|submeter|analys/i', (string) $job->message) === 1;
+
+        if (! $needsFix) {
+            return $job;
+        }
+
+        $job->progress = 100;
+        $job->message = 'Concluído';
+        $job->save();
 
         return $job->fresh();
     }
@@ -146,11 +176,58 @@ class AudioJobService
         }
 
         if (empty($job->result) && $job->external_job_id) {
-            $job->result = $this->magicChords->result($job->external_job_id);
+            $raw = $this->magicChords->result($job->external_job_id);
+            $job->result = $this->normalizedResult($job, $raw);
             $job->save();
         }
 
-        return $job->result ?? [];
+        return $this->publicResult($job->result ?? []);
+    }
+
+    /**
+     * @param  array<string, mixed>  $raw
+     * @return array<string, mixed>
+     */
+    private function normalizedResult(AudioJob $job, array $raw): array
+    {
+        $normalized = $this->normalizer->normalize(
+            $job->provider ?: 'magic_chords',
+            $raw,
+            $job->kind,
+        );
+
+        // Keep raw payload for debugging / future remapping; not exposed by default.
+        $normalized['provider_payload'] = $raw;
+
+        return $normalized;
+    }
+
+    /**
+     * @param  array<string, mixed>  $stored
+     * @return array{format: int, cues: list<array<string, mixed>>, meta: array<string, mixed>}
+     */
+    private function publicResult(array $stored): array
+    {
+        // Legacy rows: raw Magic Chords payload without cues — normalize on the fly.
+        if (! isset($stored['cues']) || ! is_array($stored['cues'])) {
+            $normalized = $this->normalizer->normalize(
+                'magic_chords',
+                $stored,
+                null,
+            );
+
+            return [
+                'format' => $normalized['format'],
+                'cues' => $normalized['cues'],
+                'meta' => $normalized['meta'],
+            ];
+        }
+
+        return [
+            'format' => (int) ($stored['format'] ?? 1),
+            'cues' => array_values($stored['cues']),
+            'meta' => is_array($stored['meta'] ?? null) ? $stored['meta'] : [],
+        ];
     }
 
     private function applyExternalSubmission(AudioJob $job, array $external): void

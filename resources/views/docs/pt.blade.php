@@ -163,10 +163,11 @@ Authorization: Bearer …
 → 201 { "job": { "id", "status", "progress", … }, "credits" }
 
 GET /api/v1/audio/jobs/{id}           → poll até status=complete
-GET /api/v1/audio/jobs/{id}/result    → acordes, tempo, key, …</pre>
+GET /api/v1/audio/jobs/{id}/result    → { format, cues[], meta }</pre>
             </div>
             <p class="hint" style="margin-top: 12px;">
-                <code>kind</code>: <code>analyze</code> (acordes/tempo/key) ou <code>transcribe</code> (letras).
+                <code>kind</code>: <code>analyze</code> (acordes) ou <code>transcribe</code> (letras).
+                O <code>result.cues</code> é o formato da app (<code>chord</code> / <code>lyric</code>).
                 Os jobs demoram — faz poll a cada 2–5s.
             </p>
         </div>
@@ -427,7 +428,37 @@ GET /api/v1/audio/jobs/{id}/result    → acordes, tempo, key, …</pre>
                 <span class="badge">Bearer</span>
             </div>
             <div class="endpoint-body">
-                Resultado completo do provider (acordes, tempo, key, …).<br>
+                Resultado normalizado para a app (independente do provider).<br>
+                <strong>Resposta:</strong>
+                <div class="code-box" style="margin-top: 10px;">
+<pre>{
+  "format": 1,
+  "cues": [
+    {
+      "id": "1789941334196048_1412144128",
+      "name": "F#m",
+      "timeMs": 293166,
+      "kind": "chord",
+      "channel": 1,
+      "number": 60,
+      "value": 100,
+      "durationMs": 3391
+    },
+    {
+      "id": "1789941914663835_2617840123",
+      "name": "The Sun is the same…",
+      "timeMs": 292499,
+      "kind": "lyric",
+      "channel": 1,
+      "number": 60,
+      "value": 100,
+      "durationMs": 6545
+    }
+  ],
+  "meta": { "provider": "magic_chords", "bpm": 120, "key": "F#m", "durationMs": 552000 }
+}</pre>
+                </div>
+                <code>kind</code> no cue: <code>chord</code> ou <code>lyric</code>.
                 <strong>409</strong> se ainda não estiver <code>complete</code>.
             </div>
         </div>
