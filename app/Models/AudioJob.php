@@ -32,6 +32,7 @@ class AudioJob extends Model
         'source_type',
         'source_path',
         'source_url',
+        'source_name',
         'credits_spent',
         'result',
         'error',
@@ -70,9 +71,33 @@ class AudioJob extends Model
             'message' => $this->message,
             'provider' => $this->provider,
             'credits_spent' => $this->credits_spent,
+            'source' => [
+                'type' => $this->source_type,
+                'name' => $this->displayName(),
+                'url' => $this->source_type === 'url' ? $this->source_url : null,
+            ],
             'error' => $this->error,
             'created_at' => $this->created_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
         ];
+    }
+
+    public function displayName(): string
+    {
+        if (filled($this->source_name)) {
+            return (string) $this->source_name;
+        }
+
+        if ($this->source_type === 'url' && filled($this->source_url)) {
+            $path = parse_url((string) $this->source_url, PHP_URL_PATH);
+
+            return $path ? basename($path) : (string) $this->source_url;
+        }
+
+        if (filled($this->source_path)) {
+            return basename((string) $this->source_path);
+        }
+
+        return 'Áudio';
     }
 }

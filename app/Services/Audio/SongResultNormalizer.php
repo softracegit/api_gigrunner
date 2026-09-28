@@ -62,28 +62,243 @@ class SongResultNormalizer
             );
         }
 
-        // Lyrics / words (transcribe)
-        foreach ($this->lyricRows($payload) as $row) {
-            $name = $this->firstString($row, ['text', 'word', 'name', 'lyric', 'label']);
-            if ($name === null || trim($name) === '') {
+        // Lyrics as full phrases (never one cue per word)
+        foreach ($this->lyricPhrases($payload) as $phrase) {
+            $cues[] = SongCueFactory::make(
+                SongCueFactory::KIND_LYRIC,
+                $phrase['name'],
+                $phrase['timeMs'],
+                $phrase['durationMs'],
+            );
+        }
+
+        unset($kind);
+
+        return $cues;
+    }
+
+    /**
+     * Build phrase-level lyric cues.
+     * Prefers provider lines/lyrics; otherwise groups words into phrases.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return list<array{name: string, timeMs: int, durationMs: int}>
+     */
+    private function lyricPhrases(array $payload): array
+    {
+        // 1) Explicit line / lyric objects with multi-word text
+        foreach (['lines', 'lyrics', 'phrases', 'lyric_lines'] as $key) {
+            if (empty($payload[$key]) || ! is_array($payload[$key])) {
+                continue;
+            }
+
+            $phrases = [];
+            foreach ($payload[$key] as $row) {
+                if (! is_array($row)) {
+                    if (is_string($row) && trim($row) !== '') {
+                        $phrases[] = [
+                            'name' => $this->normalizeLyricText($row),
+                            'timeMs' => 0,
+                            'durationMs' => 0,
+                        ];
+                    }
+
+                    continue;
+                }
+
+                $name = $this->firstString($row, ['text', 'lyric', 'name', 'label', 'content']);
+                if ($name === null || trim($name) === '') {
+                    continue;
+                }
+
+                // Skip obvious single-token word arrays mistakenly under "lyrics"
+                $wordCount = preg_match_all('/\S+/u', trim($name)) ?: 0;
+                if ($wordCount <= 1 && isset($row['word']) && ! isset($row['text'])) {
+                    continue;
+                }
+
+                $startMs = $this->startMs($row);
+                $endMs = $this->endMs($row, $startMs);
+                $phrases[] = [
+                    'name' => $this->normalizeLyricText($name),
+                    'timeMs' => $startMs,
+                    'durationMs' => max(0, $endMs - $startMs),
+                ];
+            }
+
+            if ($phrases !== []) {
+                return $phrases;
+            }
+        }
+
+        // 2) Plain transcript string → one cue per blank-line / newline block
+        if (! empty($payload['transcript']) && is_string($payload['transcript'])) {
+            $blocks = preg_split("/\n{2,}|\r\n{2,}/", trim($payload['transcript'])) ?: [];
+            $phrases = [];
+            foreach ($blocks as $block) {
+                $text = $this->normalizeLyricText($block);
+                if ($text === '') {
+                    continue;
+                }
+                $phrases[] = [
+                    'name' => $text,
+                    'timeMs' => 0,
+                    'durationMs' => 0,
+                ];
+            }
+            if ($phrases !== []) {
+                return $phrases;
+            }
+        }
+
+        // 3) Word-level timings → group into phrases / lines
+        $words = $this->wordRows($payload);
+        if ($words === []) {
+            return [];
+        }
+
+        return $this->groupWordsIntoPhrases($words);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return list<array<string, mixed>>
+     */
+    private function wordRows(array $payload): array
+    {
+        foreach (['words', 'tokens'] as $key) {
+            if (! empty($payload[$key]) && is_array($payload[$key])) {
+                return array_values(array_filter($payload[$key], 'is_array'));
+            }
+        }
+
+        if (! empty($payload['timeline']) && is_array($payload['timeline'])) {
+            return array_values(array_filter($payload['timeline'], function ($row) {
+                if (! is_array($row)) {
+                    return false;
+                }
+                $kind = strtolower((string) ($row['kind'] ?? $row['type'] ?? ''));
+
+                return in_array($kind, ['word', 'token'], true) || isset($row['word']);
+            }));
+        }
+
+        return [];
+    }
+
+    /**
+     * Group timed words into phrase cues.
+     * - short gap → same line (space)
+     * - medium gap → new line inside same cue (\n)
+     * - long gap / punctuation / length limits → new cue
+     *
+     * @param  list<array<string, mixed>>  $words
+     * @return list<array{name: string, timeMs: int, durationMs: int}>
+     */
+    private function groupWordsIntoPhrases(array $words): array
+    {
+        $lineGapMs = 320;   // break line within phrase
+        $phraseGapMs = 750; // start a new cue
+        $maxPhraseMs = 8000;
+        $maxLinesPerPhrase = 2;
+        $maxWordsPerLine = 10;
+
+        $phrases = [];
+        $lines = [];       // list of strings for current phrase
+        $currentLine = []; // words in current line
+        $phraseStart = null;
+        $phraseEnd = null;
+        $lastEnd = null;
+
+        $flushPhrase = function () use (&$phrases, &$lines, &$currentLine, &$phraseStart, &$phraseEnd) {
+            if ($currentLine !== []) {
+                $lines[] = implode(' ', $currentLine);
+                $currentLine = [];
+            }
+            if ($lines === [] || $phraseStart === null) {
+                $lines = [];
+                $phraseStart = null;
+                $phraseEnd = null;
+
+                return;
+            }
+
+            $phrases[] = [
+                'name' => $this->normalizeLyricText(implode("\n", $lines)),
+                'timeMs' => $phraseStart,
+                'durationMs' => max(0, ($phraseEnd ?? $phraseStart) - $phraseStart),
+            ];
+            $lines = [];
+            $phraseStart = null;
+            $phraseEnd = null;
+        };
+
+        foreach ($words as $row) {
+            $token = $this->firstString($row, ['word', 'text', 'name', 'token']);
+            if ($token === null) {
+                continue;
+            }
+            $token = trim($token);
+            if ($token === '' || $token === '[Music]' || $token === '(Music)') {
                 continue;
             }
 
             $startMs = $this->startMs($row);
             $endMs = $this->endMs($row, $startMs);
-            $cues[] = SongCueFactory::make(
-                SongCueFactory::KIND_LYRIC,
-                trim((string) $name),
-                $startMs,
-                max(0, $endMs - $startMs),
+            if ($endMs < $startMs) {
+                $endMs = $startMs;
+            }
+
+            $gap = $lastEnd === null ? 0 : max(0, $startMs - $lastEnd);
+            $phraseDuration = $phraseStart === null ? 0 : max(0, $startMs - $phraseStart);
+
+            $startsNewPhrase = $phraseStart !== null && (
+                $gap >= $phraseGapMs
+                || $phraseDuration >= $maxPhraseMs
+                || count($lines) >= $maxLinesPerPhrase && $gap >= $lineGapMs
             );
+
+            if ($startsNewPhrase) {
+                $flushPhrase();
+            } elseif ($phraseStart !== null && $gap >= $lineGapMs && $currentLine !== []) {
+                $lines[] = implode(' ', $currentLine);
+                $currentLine = [];
+            } elseif ($phraseStart !== null && count($currentLine) >= $maxWordsPerLine) {
+                $lines[] = implode(' ', $currentLine);
+                $currentLine = [];
+                if (count($lines) >= $maxLinesPerPhrase) {
+                    $flushPhrase();
+                }
+            }
+
+            if ($phraseStart === null) {
+                $phraseStart = $startMs;
+            }
+            $currentLine[] = $token;
+            $phraseEnd = $endMs;
+            $lastEnd = $endMs;
+
+            // Punctuation that ends a spoken sentence → close phrase
+            if (preg_match('/[.!?…]$/u', $token) === 1) {
+                $flushPhrase();
+                $lastEnd = $endMs;
+            }
         }
 
-        // If kind is analyze and we only got lyrics somehow, still fine.
-        // If empty and kind hints only one type, return empty list.
-        unset($kind);
+        $flushPhrase();
 
-        return $cues;
+        return $phrases;
+    }
+
+    private function normalizeLyricText(string $text): string
+    {
+        $text = str_replace(["\r\n", "\r"], "\n", $text);
+        $text = preg_replace("/[ \t]+\n/", "\n", $text) ?? $text;
+        $text = preg_replace("/\n[ \t]+/", "\n", $text) ?? $text;
+        $text = preg_replace('/[ \t]{2,}/', ' ', $text) ?? $text;
+        $text = preg_replace("/\n{3,}/", "\n\n", $text) ?? $text;
+
+        return trim($text);
     }
 
     /**
@@ -110,47 +325,6 @@ class SongResultNormalizer
 
                 return array_values(array_filter($rows, 'is_array'));
             }
-        }
-
-        return [];
-    }
-
-    /**
-     * @param  array<string, mixed>  $payload
-     * @return list<array<string, mixed>>
-     */
-    private function lyricRows(array $payload): array
-    {
-        foreach (['lines', 'lyrics', 'words', 'transcript'] as $key) {
-            if (empty($payload[$key]) || ! is_array($payload[$key])) {
-                continue;
-            }
-
-            $rows = $payload[$key];
-
-            // transcript may be a string
-            if ($key === 'transcript' && isset($rows[0]) && is_string($rows[0])) {
-                continue;
-            }
-
-            if ($key === 'transcript' && is_string($payload[$key])) {
-                continue;
-            }
-
-            // Prefer line-level over raw words when both exist — handled by key order
-            return array_values(array_filter($rows, 'is_array'));
-        }
-
-        if (! empty($payload['timeline']) && is_array($payload['timeline'])) {
-            return array_values(array_filter($payload['timeline'], function ($row) {
-                if (! is_array($row)) {
-                    return false;
-                }
-                $kind = strtolower((string) ($row['kind'] ?? $row['type'] ?? ''));
-
-                return in_array($kind, ['lyric', 'lyrics', 'word', 'line'], true)
-                    || isset($row['word']) || isset($row['text']);
-            }));
         }
 
         return [];

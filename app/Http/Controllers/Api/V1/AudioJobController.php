@@ -18,6 +18,39 @@ class AudioJobController extends Controller
         private CreditService $credits,
     ) {}
 
+    public function index(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
+            'kind' => ['sometimes', 'in:analyze,transcribe'],
+            'status' => ['sometimes', 'in:queued,processing,complete,failed'],
+        ]);
+
+        $query = AudioJob::query()
+            ->where('user_id', $request->user()->id)
+            ->orderByDesc('id');
+
+        if (! empty($data['kind'])) {
+            $query->where('kind', $data['kind']);
+        }
+
+        if (! empty($data['status'])) {
+            $query->where('status', $data['status']);
+        }
+
+        $paginator = $query->paginate($data['per_page'] ?? 20);
+
+        return response()->json([
+            'jobs' => $paginator->getCollection()->map->toStatusArray()->values(),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
+        ]);
+    }
+
     public function store(Request $request): JsonResponse
     {
         $kind = $request->input('kind', AudioJob::KIND_ANALYZE);

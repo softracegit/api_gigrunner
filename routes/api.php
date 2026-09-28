@@ -36,6 +36,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/credits', [CreditController::class, 'index']);
         Route::post('/credits/consume', [CreditController::class, 'consume']);
         Route::post('/credits/purchase-test', [CreditController::class, 'purchaseTest']);
+        Route::get('/audio/jobs', [AudioJobController::class, 'index']);
         Route::post('/audio/jobs', [AudioJobController::class, 'store']);
         Route::get('/audio/jobs/{uuid}', [AudioJobController::class, 'show']);
         Route::get('/audio/jobs/{uuid}/result', [AudioJobController::class, 'result']);

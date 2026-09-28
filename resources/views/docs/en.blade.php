@@ -48,6 +48,7 @@
                 <a href="#credits-purchase" data-docs-link>POST /purchase-test</a>
                 <div class="docs-nav-label">Audio</div>
                 <a href="#audio-jobs" data-docs-link>POST /audio/jobs</a>
+                <a href="#audio-jobs-list" data-docs-link>GET /audio/jobs</a>
                 <a href="#audio-job-status" data-docs-link>GET /jobs/{id}</a>
                 <a href="#audio-job-result" data-docs-link>GET /result</a>
             </div>
@@ -407,6 +408,19 @@ GET /api/v1/audio/jobs/{id}/result    → { format, cues[], meta }</pre>
                 <strong>JSON:</strong> <code>{ "url": "https://…", "kind": "analyze"|"transcribe" }</code><br>
                 <strong>multipart:</strong> <code>file</code> + <code>kind</code><br>
                 <strong>201:</strong> <code>{ job, credits }</code> · <strong>402</strong> no credits · <strong>403</strong> no licence
+            </div>
+        </div>
+
+        <div class="endpoint" id="audio-jobs-list">
+            <div class="endpoint-head">
+                <span class="method get">GET</span>
+                <span class="endpoint-path">/api/v1/audio/jobs</span>
+                <span class="badge">Bearer</span>
+            </div>
+            <div class="endpoint-body">
+                Lists the authenticated user’s audio jobs (upload/URL history).<br>
+                <strong>Query:</strong> <code>per_page</code>?, <code>kind</code>?, <code>status</code>?<br>
+                <strong>Response:</strong> <code>{ jobs: [{ id, kind, status, source: { type, name, url }, … }], meta }</code>
             </div>
         </div>
 

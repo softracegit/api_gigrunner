@@ -59,6 +59,7 @@
                     <button type="button" class="btn secondary" id="btnMe">GET /me</button>
                     <button type="button" class="btn secondary" id="btnLicense">GET /license</button>
                     <button type="button" class="btn secondary" id="btnCredits">GET /credits</button>
+                    <button type="button" class="btn secondary" id="btnAudioList">GET /audio/jobs</button>
                     <button type="button" class="btn danger" id="btnLogout">POST /logout</button>
                 </div>
             </div>

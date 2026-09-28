@@ -188,6 +188,7 @@
         document.getElementById('btnMe').addEventListener('click', () => callApi('GET', '/me', null, true));
         document.getElementById('btnLicense').addEventListener('click', () => callApi('GET', '/license', null, true));
         document.getElementById('btnCredits').addEventListener('click', () => callApi('GET', '/credits', null, true));
+        document.getElementById('btnAudioList').addEventListener('click', () => callApi('GET', '/audio/jobs', null, true));
         document.getElementById('btnActivateLicense').addEventListener('click', () => callApi('POST', '/license/activate-test', {}, true));
         document.getElementById('btnRevokeLicense').addEventListener('click', () => callApi('POST', '/license/revoke', {}, true));
         document.getElementById('btnConsumeAi').addEventListener('click', () => callApi('POST', '/credits/consume', { type: 'ai', amount: 1, reason: 'playground' }, true));

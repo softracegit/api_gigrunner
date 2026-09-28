@@ -38,6 +38,7 @@ class AudioJobService
             'status' => AudioJob::STATUS_QUEUED,
             'source_type' => 'file',
             'source_path' => $path,
+            'source_name' => $file->getClientOriginalName(),
             'credits_spent' => $cost,
             'message' => 'A submeter ao provider…',
         ]);
@@ -81,6 +82,7 @@ class AudioJobService
             'status' => AudioJob::STATUS_QUEUED,
             'source_type' => 'url',
             'source_url' => $url,
+            'source_name' => basename(parse_url($url, PHP_URL_PATH) ?: $url) ?: $url,
             'credits_spent' => $cost,
             'message' => 'A submeter ao provider…',
         ]);
@@ -181,7 +183,11 @@ class AudioJobService
             $job->save();
         }
 
-        return $this->publicResult($job->result ?? []);
+        return $this->publicResult(
+            $job->result ?? [],
+            $job->provider,
+            $job->kind,
+        );
     }
 
     /**
@@ -206,14 +212,29 @@ class AudioJobService
      * @param  array<string, mixed>  $stored
      * @return array{format: int, cues: list<array<string, mixed>>, meta: array<string, mixed>}
      */
-    private function publicResult(array $stored): array
+    private function publicResult(array $stored, ?string $provider = null, ?string $kind = null): array
     {
+        // Prefer remapping from raw provider payload (e.g. regroup words → phrases).
+        if (! empty($stored['provider_payload']) && is_array($stored['provider_payload'])) {
+            $normalized = $this->normalizer->normalize(
+                $provider ?: (string) ($stored['meta']['provider'] ?? 'magic_chords'),
+                $stored['provider_payload'],
+                $kind ?? ($stored['meta']['kind'] ?? null),
+            );
+
+            return [
+                'format' => $normalized['format'],
+                'cues' => $normalized['cues'],
+                'meta' => $normalized['meta'],
+            ];
+        }
+
         // Legacy rows: raw Magic Chords payload without cues — normalize on the fly.
         if (! isset($stored['cues']) || ! is_array($stored['cues'])) {
             $normalized = $this->normalizer->normalize(
-                'magic_chords',
+                $provider ?: 'magic_chords',
                 $stored,
-                null,
+                $kind,
             );
 
             return [

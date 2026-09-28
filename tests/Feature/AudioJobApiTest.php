@@ -86,6 +86,34 @@ class AudioJobApiTest extends TestCase
             ->assertJsonPath('result.cues.1.kind', 'lyric');
     }
 
+    public function test_lists_user_audio_jobs(): void
+    {
+        Http::fake([
+            'https://magic-chords.dev/api/v1/analyze/url' => Http::response([
+                'job_id' => 'ext-list-1',
+                'status' => 'processing',
+            ], 200),
+        ]);
+
+        $user = $this->licensedUserWithCredits(5);
+        $token = $user->createToken('test')->plainTextToken;
+
+        $this->postJson('/api/v1/audio/jobs', [
+            'url' => 'https://example.com/my-song.mp3',
+            'kind' => 'analyze',
+        ], [
+            'Authorization' => 'Bearer '.$token,
+        ])->assertCreated();
+
+        $this->getJson('/api/v1/audio/jobs', [
+            'Authorization' => 'Bearer '.$token,
+        ])->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('jobs.0.source.type', 'url')
+            ->assertJsonPath('jobs.0.source.name', 'my-song.mp3')
+            ->assertJsonPath('jobs.0.source.url', 'https://example.com/my-song.mp3');
+    }
+
     public function test_rejects_without_license(): void
     {
         $user = User::factory()->create();
