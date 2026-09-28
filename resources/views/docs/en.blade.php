@@ -1,37 +1,59 @@
 <div class="docs-shell">
     <aside class="docs-side">
         <p class="side-title">Documentation</p>
-        <a href="#inicio" class="active" data-docs-link>Overview</a>
-        <a href="#guia" data-docs-link>Integration guide</a>
-        <a href="#guia-setup" data-docs-link>— Setup</a>
-        <a href="#guia-login" data-docs-link>— Login</a>
-        <a href="#guia-arranque" data-docs-link>— Startup</a>
-        <a href="#guia-ai" data-docs-link>— Using AI</a>
-        <a href="#guia-audio" data-docs-link>— Audio analysis</a>
-        <a href="#guia-offline" data-docs-link>— Offline</a>
-        <a href="#guia-erros" data-docs-link>— App errors</a>
-        <a href="#guia-checklist" data-docs-link>— Checklist</a>
-        <a href="#fluxo" data-docs-link>Flow</a>
-        <a href="#auth" data-docs-link>Authentication</a>
-        <a href="#endpoints" data-docs-link>Endpoints</a>
-        <a href="#health" data-docs-link>GET /health</a>
-        <a href="#register" data-docs-link>POST /register</a>
-        <a href="#login" data-docs-link>POST /login</a>
-        <a href="#me" data-docs-link>GET /me</a>
-        <a href="#license" data-docs-link>GET /license</a>
-        <a href="#activate-test" data-docs-link>POST /license/activate-test</a>
-        <a href="#revoke" data-docs-link>POST /license/revoke</a>
-        <a href="#credits-model" data-docs-link>Credits model</a>
-        <a href="#credits" data-docs-link>GET /credits</a>
-        <a href="#credits-consume" data-docs-link>POST /credits/consume</a>
-        <a href="#credits-purchase" data-docs-link>POST /credits/purchase-test</a>
-        <a href="#audio-jobs" data-docs-link>POST /audio/jobs</a>
-        <a href="#audio-job-status" data-docs-link>GET /audio/jobs/{id}</a>
-        <a href="#audio-job-result" data-docs-link>GET /audio/jobs/{id}/result</a>
-        <a href="#logout" data-docs-link>POST /logout</a>
-        <a href="#erros" data-docs-link>Errors</a>
-        <a href="#user" data-docs-link>User object</a>
-        <a href="{{ route('playground') }}">Playground →</a>
+        <a href="#inicio" class="docs-top active" data-docs-link>Overview</a>
+
+        <details class="docs-nav-group" open>
+            <summary>Integration guide</summary>
+            <div class="docs-nav-sub">
+                <a href="#guia" data-docs-link>Overview</a>
+                <a href="#guia-setup" data-docs-link>Setup</a>
+                <a href="#guia-login" data-docs-link>Login</a>
+                <a href="#guia-arranque" data-docs-link>Startup</a>
+                <a href="#guia-ai" data-docs-link>Using AI</a>
+                <a href="#guia-audio" data-docs-link>Audio analysis</a>
+                <a href="#guia-offline" data-docs-link>Offline</a>
+                <a href="#guia-erros" data-docs-link>App errors</a>
+                <a href="#guia-checklist" data-docs-link>Checklist</a>
+            </div>
+        </details>
+
+        <details class="docs-nav-group" open>
+            <summary>Concepts</summary>
+            <div class="docs-nav-sub">
+                <a href="#fluxo" data-docs-link>Flow</a>
+                <a href="#auth" data-docs-link>Authentication</a>
+                <a href="#credits-model" data-docs-link>Licence vs credits</a>
+                <a href="#erros" data-docs-link>Common errors</a>
+                <a href="#user" data-docs-link>User object</a>
+            </div>
+        </details>
+
+        <details class="docs-nav-group" open>
+            <summary>Endpoints</summary>
+            <div class="docs-nav-sub">
+                <div class="docs-nav-label">Auth</div>
+                <a href="#health" data-docs-link>GET /health</a>
+                <a href="#register" data-docs-link>POST /register</a>
+                <a href="#login" data-docs-link>POST /login</a>
+                <a href="#me" data-docs-link>GET /me</a>
+                <a href="#logout" data-docs-link>POST /logout</a>
+                <div class="docs-nav-label">Licence</div>
+                <a href="#license" data-docs-link>GET /license</a>
+                <a href="#activate-test" data-docs-link>POST /activate-test</a>
+                <a href="#revoke" data-docs-link>POST /revoke</a>
+                <div class="docs-nav-label">Credits</div>
+                <a href="#credits" data-docs-link>GET /credits</a>
+                <a href="#credits-consume" data-docs-link>POST /consume</a>
+                <a href="#credits-purchase" data-docs-link>POST /purchase-test</a>
+                <div class="docs-nav-label">Audio</div>
+                <a href="#audio-jobs" data-docs-link>POST /audio/jobs</a>
+                <a href="#audio-job-status" data-docs-link>GET /jobs/{id}</a>
+                <a href="#audio-job-result" data-docs-link>GET /result</a>
+            </div>
+        </details>
+
+        <a class="docs-footer-link" href="{{ route('playground') }}">Playground →</a>
     </aside>
 
     <main class="docs-main" id="docsMain">

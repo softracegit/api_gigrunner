@@ -1,30 +1,82 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" data-theme="dark">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>@yield('title', 'GigRunner API')</title>
+    <script>
+        (function () {
+            try {
+                var t = localStorage.getItem('gigrunner_theme');
+                if (t !== 'light' && t !== 'dark') {
+                    t = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+                }
+                document.documentElement.setAttribute('data-theme', t);
+            } catch (e) {
+                document.documentElement.setAttribute('data-theme', 'dark');
+            }
+        })();
+    </script>
     <style>
-        :root {
+        :root,
+        html[data-theme="dark"] {
             --bg: #0f1419;
+            --bg-glow: #1b2a3a;
             --panel: #1a222c;
+            --panel-2: #141b24;
             --text: #e8eef4;
             --muted: #8b9aab;
             --accent: #3d9cfd;
             --accent-2: #2a7fd4;
+            --brand: #fdb05e;
             --danger: #f07178;
             --ok: #7fd99a;
             --border: #2a3542;
             --input: #121820;
+            --hover: #222b36;
+            --active: #243040;
+            --endpoint-head: #161e27;
+            --code-muted: #b7c6d6;
+            --btn-fg: #041018;
+            --nav-bg: color-mix(in srgb, #1a222c 80%, transparent);
             --method-get: #7fd99a;
             --method-post: #3d9cfd;
+            --theme-icon-sun: none;
+            --theme-icon-moon: block;
+            color-scheme: dark;
+        }
+        html[data-theme="light"] {
+            --bg: #f4f6f9;
+            --bg-glow: #dce8f5;
+            --panel: #ffffff;
+            --panel-2: #eef2f7;
+            --text: #15202b;
+            --muted: #5b6b7c;
+            --accent: #1a7fd4;
+            --accent-2: #1569b0;
+            --brand: #e8942e;
+            --danger: #d64545;
+            --ok: #2a9d5c;
+            --border: #d5dde6;
+            --input: #f7f9fc;
+            --hover: #e8eef5;
+            --active: #dce6f0;
+            --endpoint-head: #f0f4f8;
+            --code-muted: #4a5a6a;
+            --btn-fg: #ffffff;
+            --nav-bg: color-mix(in srgb, #ffffff 88%, transparent);
+            --method-get: #2a9d5c;
+            --method-post: #1a7fd4;
+            --theme-icon-sun: block;
+            --theme-icon-moon: none;
+            color-scheme: light;
         }
         * { box-sizing: border-box; }
         body {
             margin: 0;
             min-height: 100vh;
             font-family: "Segoe UI", system-ui, sans-serif;
-            background: radial-gradient(1200px 600px at 10% -10%, #1b2a3a 0%, var(--bg) 55%);
+            background: radial-gradient(1200px 600px at 10% -10%, var(--bg-glow) 0%, var(--bg) 55%);
             color: var(--text);
         }
         .topnav {
@@ -33,21 +85,31 @@
             gap: 8px 16px;
             align-items: center;
             justify-content: space-between;
-            padding: 14px 20px;
+            padding: 12px 20px;
             border-bottom: 1px solid var(--border);
-            background: color-mix(in srgb, var(--panel) 80%, transparent);
+            background: var(--nav-bg);
             backdrop-filter: blur(8px);
             position: sticky;
             top: 0;
             z-index: 10;
         }
         .topnav .logo {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
             font-weight: 700;
             letter-spacing: 0.04em;
             text-decoration: none;
             color: var(--text);
             font-size: 0.95rem;
         }
+        .topnav .logo img {
+            width: 28px;
+            height: 28px;
+            display: block;
+            flex-shrink: 0;
+        }
+        .topnav .logo-text { line-height: 1; }
         .topnav .nav-links {
             display: flex;
             flex-wrap: wrap;
@@ -60,22 +122,23 @@
             padding: 6px 10px;
             border-radius: 8px;
         }
-        .topnav a.nav:hover { color: var(--text); background: #222b36; }
-        .topnav a.nav.active { color: var(--text); background: #243040; }
+        .topnav a.nav:hover { color: var(--text); background: var(--hover); }
+        .topnav a.nav.active { color: var(--text); background: var(--active); }
         .topnav .nav-right {
             display: flex;
             flex-wrap: wrap;
             align-items: center;
             gap: 6px 12px;
         }
-        .lang-switch {
+        .lang-switch,
+        .theme-toggle {
             display: inline-flex;
             align-items: center;
             gap: 2px;
             border: 1px solid var(--border);
             border-radius: 8px;
             padding: 2px;
-            background: #121820;
+            background: var(--input);
         }
         .lang-switch a {
             color: var(--muted);
@@ -89,8 +152,18 @@
         .lang-switch a:hover { color: var(--text); }
         .lang-switch a.active {
             color: var(--text);
-            background: #243040;
+            background: var(--active);
         }
+        .theme-toggle {
+            cursor: pointer;
+            color: var(--muted);
+            background: var(--input);
+            padding: 6px 8px;
+        }
+        .theme-toggle:hover { color: var(--text); border-color: var(--muted); }
+        .theme-toggle svg { width: 16px; height: 16px; display: block; }
+        .theme-toggle .icon-sun { display: var(--theme-icon-sun); }
+        .theme-toggle .icon-moon { display: var(--theme-icon-moon); }
         .wrap {
             max-width: 440px;
             margin: 0 auto;
@@ -174,19 +247,19 @@
             border: 0;
             border-radius: 10px;
             background: var(--accent);
-            color: #041018;
+            color: var(--btn-fg);
             font-weight: 650;
             font-size: 0.95rem;
             cursor: pointer;
             text-decoration: none;
         }
-        .btn:hover { background: var(--accent-2); color: #041018; }
+        .btn:hover { background: var(--accent-2); color: var(--btn-fg); }
         .btn.secondary {
             background: transparent;
             border: 1px solid var(--border);
             color: var(--text);
         }
-        .btn.secondary:hover { border-color: var(--muted); background: #222b36; }
+        .btn.secondary:hover { border-color: var(--muted); background: var(--hover); }
         .btn.danger {
             background: transparent;
             border: 1px solid color-mix(in srgb, var(--danger) 45%, var(--border));
@@ -266,7 +339,7 @@
         .hint code {
             font-family: ui-monospace, Consolas, monospace;
             font-size: 0.78rem;
-            color: #b7c6d6;
+            color: var(--code-muted);
         }
         .check { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 0.9rem; margin-bottom: 16px; }
         .endpoint {
@@ -283,7 +356,7 @@
             align-items: center;
             padding: 12px 16px;
             border-bottom: 1px solid var(--border);
-            background: #161e27;
+            background: var(--endpoint-head);
         }
         .method {
             font-family: ui-monospace, Consolas, monospace;
@@ -318,7 +391,7 @@
             border-radius: 999px;
             padding: 6px 12px;
         }
-        .toc a:hover { background: #222b36; }
+        .toc a:hover { background: var(--hover); }
         .status-line {
             font-family: ui-monospace, Consolas, monospace;
             font-size: 0.85rem;
@@ -335,7 +408,6 @@
             .grid-2 { grid-template-columns: 1fr 1fr; }
         }
 
-        /* Full-screen shells (docs / playground) */
         html, body.shell-page {
             height: 100%;
             overflow: hidden;
@@ -360,18 +432,17 @@
             overflow: hidden;
         }
 
-        /* Docs layout */
         .docs-shell {
             display: grid;
-            grid-template-columns: 220px 1fr;
+            grid-template-columns: 250px 1fr;
             min-height: 0;
             flex: 1;
             overflow: hidden;
         }
         .docs-side {
             border-right: 1px solid var(--border);
-            background: #141b24;
-            padding: 20px 14px;
+            background: var(--panel-2);
+            padding: 16px 12px 24px;
             overflow-y: auto;
         }
         .docs-side .side-title {
@@ -381,7 +452,7 @@
             color: var(--muted);
             margin: 0 0 12px 8px;
         }
-        .docs-side a {
+        .docs-side > a.docs-top {
             display: block;
             color: var(--muted);
             text-decoration: none;
@@ -390,13 +461,76 @@
             border-radius: 8px;
             margin-bottom: 2px;
         }
-        .docs-side a[href^="#guia-"] {
-            font-size: 0.82rem;
-            padding: 5px 10px 5px 18px;
-            opacity: 0.92;
+        .docs-side > a.docs-top:hover { color: var(--text); background: var(--hover); }
+        .docs-side > a.docs-top.active { color: var(--text); background: var(--active); }
+        .docs-nav-group {
+            margin: 6px 0 4px;
+            border: 1px solid transparent;
+            border-radius: 10px;
         }
-        .docs-side a:hover { color: var(--text); background: #222b36; }
-        .docs-side a.active { color: var(--text); background: #243040; }
+        .docs-nav-group > summary {
+            list-style: none;
+            cursor: pointer;
+            color: var(--text);
+            font-size: 0.82rem;
+            font-weight: 650;
+            padding: 8px 10px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            user-select: none;
+        }
+        .docs-nav-group > summary::-webkit-details-marker { display: none; }
+        .docs-nav-group > summary::after {
+            content: '';
+            width: 0.4rem;
+            height: 0.4rem;
+            border-right: 1.5px solid var(--muted);
+            border-bottom: 1.5px solid var(--muted);
+            transform: rotate(-45deg);
+            transition: transform 0.15s ease;
+            flex-shrink: 0;
+        }
+        .docs-nav-group[open] > summary::after {
+            transform: rotate(45deg);
+        }
+        .docs-nav-group > summary:hover { background: var(--hover); }
+        .docs-nav-sub {
+            padding: 2px 0 6px 6px;
+            display: grid;
+            gap: 1px;
+        }
+        .docs-nav-sub a {
+            display: block;
+            color: var(--muted);
+            text-decoration: none;
+            font-size: 0.82rem;
+            padding: 6px 10px;
+            border-radius: 8px;
+        }
+        .docs-nav-sub a:hover { color: var(--text); background: var(--hover); }
+        .docs-nav-sub a.active { color: var(--text); background: var(--active); }
+        .docs-nav-label {
+            font-size: 0.68rem;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--muted);
+            padding: 8px 10px 4px;
+            opacity: 0.85;
+        }
+        .docs-side .docs-footer-link {
+            display: block;
+            margin-top: 14px;
+            color: var(--accent);
+            text-decoration: none;
+            font-size: 0.88rem;
+            padding: 8px 10px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+        .docs-side .docs-footer-link:hover { background: var(--hover); }
         .docs-main {
             overflow-y: auto;
             padding: 28px 32px 48px;
@@ -404,7 +538,6 @@
         .docs-main .card { max-width: 780px; }
         .docs-main .endpoint { max-width: 780px; }
 
-        /* Playground layout — 3 resizable columns */
         .pg-shell {
             display: flex;
             flex-direction: row;
@@ -428,7 +561,7 @@
         .pg-col-auth {
             flex: 0 0 300px;
             width: 300px;
-            background: #141b24;
+            background: var(--panel-2);
         }
         .pg-col-actions {
             flex: 1 1 auto;
@@ -437,7 +570,7 @@
         .pg-col-response {
             flex: 0 0 360px;
             width: 360px;
-            background: #121820;
+            background: var(--input);
             display: flex;
             flex-direction: column;
         }
@@ -488,7 +621,7 @@
             flex: 1;
             min-height: 0;
             overflow: auto;
-            background: #0d1218;
+            background: color-mix(in srgb, var(--input) 70%, var(--bg));
         }
         .pg-col-response .code-box pre {
             padding: 12px 14px;
@@ -539,12 +672,8 @@
                 z-index: 5;
                 border-right: 0;
                 border-bottom: 1px solid var(--border);
-                display: flex;
-                flex-wrap: wrap;
-                gap: 4px;
-                padding: 10px;
+                max-height: 42vh;
             }
-            .docs-side .side-title { width: 100%; margin: 0 0 6px 4px; }
             .docs-main { overflow: visible; padding: 20px 16px 40px; }
             .pg-shell {
                 display: block;
@@ -571,18 +700,27 @@
 </head>
 <body class="@yield('body_class')">
     <nav class="topnav">
-        <a class="logo" href="{{ route('home') }}">GigRunner API</a>
+        <a class="logo" href="{{ route('home') }}">
+            <img src="{{ asset('images/logo.png') }}" alt="" width="28" height="28">
+            <span class="logo-text">GigRunner API</span>
+        </a>
         <div class="nav-right">
             <div class="nav-links">
                 <a class="nav {{ request()->routeIs('docs') ? 'active' : '' }}" href="{{ route('docs') }}">{{ __('ui.nav_docs') }}</a>
                 <a class="nav {{ request()->routeIs('playground') ? 'active' : '' }}" href="{{ route('playground') }}">{{ __('ui.nav_playground') }}</a>
                 @auth
                     <a class="nav {{ request()->routeIs('account') ? 'active' : '' }}" href="{{ route('account') }}">{{ __('ui.nav_account') }}</a>
-                @else
-                    <a class="nav {{ request()->routeIs('login') ? 'active' : '' }}" href="{{ route('login') }}">{{ __('ui.nav_login') }}</a>
-                    <a class="nav {{ request()->routeIs('register') ? 'active' : '' }}" href="{{ route('register') }}">{{ __('ui.nav_register') }}</a>
                 @endauth
             </div>
+            <button type="button" class="theme-toggle" id="themeToggle" aria-label="Toggle theme" title="Dark / Light">
+                <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <circle cx="12" cy="12" r="4"/>
+                    <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>
+                </svg>
+                <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path d="M21 14.5A8.5 8.5 0 0 1 9.5 3 7 7 0 1 0 21 14.5z"/>
+                </svg>
+            </button>
             <div class="lang-switch" aria-label="Language">
                 <a href="{{ route('locale.switch', 'pt') }}" class="{{ app()->getLocale() === 'pt' ? 'active' : '' }}">PT</a>
                 <a href="{{ route('locale.switch', 'en') }}" class="{{ app()->getLocale() === 'en' ? 'active' : '' }}">EN</a>
@@ -592,5 +730,16 @@
     <div class="wrap @yield('wrap_class')">
         @yield('content')
     </div>
+    <script>
+        (function () {
+            var btn = document.getElementById('themeToggle');
+            if (!btn) return;
+            btn.addEventListener('click', function () {
+                var next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+                document.documentElement.setAttribute('data-theme', next);
+                try { localStorage.setItem('gigrunner_theme', next); } catch (e) {}
+            });
+        })();
+    </script>
 </body>
 </html>
