@@ -18,7 +18,7 @@ class SongResultNormalizerTest extends TestCase
                 ['label' => 'E', 'start' => 4.0, 'end' => 6.0],
             ],
             'lines' => [
-                ['text' => "Line one\nLine two", 'start' => 1.5, 'end' => 4.2],
+                ['text' => 'Line one', 'start' => 1.5, 'end' => 4.2],
             ],
         ], 'analyze');
 
@@ -42,25 +42,44 @@ class SongResultNormalizerTest extends TestCase
         $this->assertNotEmpty($first['id']);
     }
 
-    public function test_groups_words_into_phrase_cues_with_line_breaks(): void
+    public function test_uses_magic_chords_whisper_segment_text_as_lyric_cues(): void
     {
         $out = (new SongResultNormalizer)->normalize('magic_chords', [
+            'segments' => [
+                [
+                    'start' => 34.9,
+                    'end' => 38.12,
+                    'text' => "Hey, I'm a diamond",
+                    'words' => [
+                        ['start' => 34.9, 'end' => 34.9, 'word' => ' Hey,'],
+                        ['start' => 35.62, 'end' => 37.32, 'word' => " I'm"],
+                        ['start' => 37.32, 'end' => 37.44, 'word' => ' a'],
+                        ['start' => 37.44, 'end' => 38.12, 'word' => ' diamond'],
+                    ],
+                ],
+                [
+                    'start' => 40.36,
+                    'end' => 43.26,
+                    'text' => "I'm spinning clay",
+                    'words' => [],
+                ],
+                [
+                    'start' => 43.26,
+                    'end' => 47.46,
+                    'text' => 'I am the wheel',
+                    'words' => [],
+                ],
+                [
+                    'start' => 1.0,
+                    'end' => 2.0,
+                    'text' => 'Music',
+                    'words' => [],
+                ],
+            ],
+            // Flat words must be ignored when phrase segments exist
             'words' => [
-                ['word' => 'Ticking', 'start' => 10.0, 'end' => 10.3],
-                ['word' => 'away', 'start' => 10.35, 'end' => 10.6],
-                ['word' => 'the', 'start' => 10.65, 'end' => 10.8],
-                ['word' => 'moments', 'start' => 10.85, 'end' => 11.3],
-                // medium gap → new line inside same phrase
-                ['word' => 'That', 'start' => 11.7, 'end' => 11.9],
-                ['word' => 'make', 'start' => 11.95, 'end' => 12.1],
-                ['word' => 'up', 'start' => 12.15, 'end' => 12.3],
-                ['word' => 'a', 'start' => 12.35, 'end' => 12.4],
-                ['word' => 'dull', 'start' => 12.45, 'end' => 12.7],
-                ['word' => 'day', 'start' => 12.75, 'end' => 13.0],
-                // long gap → new phrase
-                ['word' => 'Fritter', 'start' => 14.5, 'end' => 14.9],
-                ['word' => 'and', 'start' => 14.95, 'end' => 15.1],
-                ['word' => 'waste', 'start' => 15.15, 'end' => 15.5],
+                ['word' => 'should', 'start' => 0, 'end' => 1],
+                ['word' => 'ignore', 'start' => 1, 'end' => 2],
             ],
         ], 'transcribe');
 
@@ -69,10 +88,42 @@ class SongResultNormalizerTest extends TestCase
             fn (array $c) => $c['kind'] === 'lyric'
         ));
 
-        $this->assertCount(2, $lyrics);
-        $this->assertSame("Ticking away the moments\nThat make up a dull day", $lyrics[0]['name']);
-        $this->assertSame(10000, $lyrics[0]['timeMs']);
-        $this->assertSame(3000, $lyrics[0]['durationMs']);
-        $this->assertSame('Fritter and waste', $lyrics[1]['name']);
+        $this->assertSame([
+            "Hey, I'm a diamond",
+            "I'm spinning clay",
+            'I am the wheel',
+        ], array_column($lyrics, 'name'));
+
+        $this->assertSame(34900, $lyrics[0]['timeMs']);
+        $this->assertSame(3220, $lyrics[0]['durationMs']);
+        $this->assertSame(1, $lyrics[0]['channel']);
+        $this->assertSame(60, $lyrics[0]['number']);
+        $this->assertSame(100, $lyrics[0]['value']);
+    }
+
+    public function test_groups_words_into_full_lyric_lines_as_fallback(): void
+    {
+        $out = (new SongResultNormalizer)->normalize('magic_chords', [
+            'words' => [
+                ['word' => 'Music', 'start' => 0.0, 'end' => 0.4],
+                ['word' => 'Hey,', 'start' => 1.0, 'end' => 1.2],
+                ['word' => "I'm", 'start' => 1.25, 'end' => 1.4],
+                ['word' => 'a', 'start' => 1.45, 'end' => 1.5],
+                ['word' => 'diamond', 'start' => 1.55, 'end' => 2.0],
+                ['word' => "I'm", 'start' => 2.7, 'end' => 2.85],
+                ['word' => 'spinning', 'start' => 2.9, 'end' => 3.3],
+                ['word' => 'clay', 'start' => 3.35, 'end' => 3.7],
+            ],
+        ], 'transcribe');
+
+        $lyrics = array_values(array_filter(
+            $out['cues'],
+            fn (array $c) => $c['kind'] === 'lyric'
+        ));
+
+        $this->assertSame([
+            "Hey, I'm a diamond",
+            "I'm spinning clay",
+        ], array_column($lyrics, 'name'));
     }
 }

@@ -78,49 +78,32 @@ class SongResultNormalizer
     }
 
     /**
-     * Build phrase-level lyric cues.
-     * Prefers provider lines/lyrics; otherwise groups words into phrases.
+     * Build phrase-level lyric cues from Magic Chords / Whisper segments.
+     * Prefer segment.text (full phrase); only fall back to grouping words.
      *
      * @param  array<string, mixed>  $payload
      * @return list<array{name: string, timeMs: int, durationMs: int}>
      */
     private function lyricPhrases(array $payload): array
     {
-        // 1) Explicit line / lyric objects with multi-word text
-        foreach (['lines', 'lyrics', 'phrases', 'lyric_lines'] as $key) {
-            if (empty($payload[$key]) || ! is_array($payload[$key])) {
-                continue;
-            }
-
+        // 1) Whisper-style segments already phrased (Magic Chords transcribe)
+        $segments = $this->whisperStyleSegments($payload);
+        if ($segments !== []) {
             $phrases = [];
-            foreach ($payload[$key] as $row) {
-                if (! is_array($row)) {
-                    if (is_string($row) && trim($row) !== '') {
-                        $phrases[] = [
-                            'name' => $this->normalizeLyricText($row),
-                            'timeMs' => 0,
-                            'durationMs' => 0,
-                        ];
-                    }
-
+            foreach ($segments as $row) {
+                $name = $this->firstString($row, ['text', 'lyric', 'content']);
+                if ($name === null) {
                     continue;
                 }
-
-                $name = $this->firstString($row, ['text', 'lyric', 'name', 'label', 'content']);
-                if ($name === null || trim($name) === '') {
-                    continue;
-                }
-
-                // Skip obvious single-token word arrays mistakenly under "lyrics"
-                $wordCount = preg_match_all('/\S+/u', trim($name)) ?: 0;
-                if ($wordCount <= 1 && isset($row['word']) && ! isset($row['text'])) {
+                $name = $this->normalizeLyricText($name);
+                if ($name === '' || $this->isNoiseLyricToken($name)) {
                     continue;
                 }
 
                 $startMs = $this->startMs($row);
                 $endMs = $this->endMs($row, $startMs);
                 $phrases[] = [
-                    'name' => $this->normalizeLyricText($name),
+                    'name' => $name,
                     'timeMs' => $startMs,
                     'durationMs' => max(0, $endMs - $startMs),
                 ];
@@ -131,13 +114,13 @@ class SongResultNormalizer
             }
         }
 
-        // 2) Plain transcript string → one cue per blank-line / newline block
+        // 2) Plain transcript string → one cue per paragraph
         if (! empty($payload['transcript']) && is_string($payload['transcript'])) {
             $blocks = preg_split("/\n{2,}|\r\n{2,}/", trim($payload['transcript'])) ?: [];
             $phrases = [];
             foreach ($blocks as $block) {
                 $text = $this->normalizeLyricText($block);
-                if ($text === '') {
+                if ($text === '' || $this->isNoiseLyricToken($text)) {
                     continue;
                 }
                 $phrases[] = [
@@ -151,7 +134,7 @@ class SongResultNormalizer
             }
         }
 
-        // 3) Word-level timings → group into phrases / lines
+        // 3) Last resort: flat words → group into lines
         $words = $this->wordRows($payload);
         if ($words === []) {
             return [];
@@ -161,13 +144,67 @@ class SongResultNormalizer
     }
 
     /**
+     * Magic Chords / Whisper phrase segments: { start, end, text, words? }.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return list<array<string, mixed>>
+     */
+    private function whisperStyleSegments(array $payload): array
+    {
+        $candidates = [];
+
+        foreach (['lines', 'lyrics', 'phrases', 'lyric_lines', 'utterances', 'speech_segments', 'segments'] as $key) {
+            if (! empty($payload[$key]) && is_array($payload[$key])) {
+                $candidates[] = $payload[$key];
+            }
+        }
+
+        if (! empty($payload['transcription']) && is_array($payload['transcription'])) {
+            $nested = $payload['transcription'];
+            if (! empty($nested['segments']) && is_array($nested['segments'])) {
+                $candidates[] = $nested['segments'];
+            } elseif (array_is_list($nested)) {
+                $candidates[] = $nested;
+            }
+        }
+
+        foreach ($candidates as $rows) {
+            $filtered = [];
+            foreach ($rows as $row) {
+                if (! is_array($row)) {
+                    continue;
+                }
+                // Must be a phrase segment with text (not a chord label segment)
+                if (! isset($row['text']) || ! is_string($row['text'])) {
+                    continue;
+                }
+                // Skip chord-shaped rows that happen to include text
+                if (isset($row['label']) || isset($row['chord'])) {
+                    continue;
+                }
+                $filtered[] = $row;
+            }
+
+            if ($filtered !== []) {
+                return array_values($filtered);
+            }
+        }
+
+        return [];
+    }
+
+    /**
      * @param  array<string, mixed>  $payload
      * @return list<array<string, mixed>>
      */
     private function wordRows(array $payload): array
     {
+        // Prefer top-level words only when we are in fallback mode.
+        // Nested words inside whisper segments are ignored here on purpose.
         foreach (['words', 'tokens'] as $key) {
             if (! empty($payload[$key]) && is_array($payload[$key])) {
+                // If entries look like Whisper word objects but parent also has
+                // phrase segments, whisperStyleSegments already won.
                 return array_values(array_filter($payload[$key], 'is_array'));
             }
         }
@@ -187,51 +224,15 @@ class SongResultNormalizer
     }
 
     /**
-     * Group timed words into phrase cues.
-     * - short gap → same line (space)
-     * - medium gap → new line inside same cue (\n)
-     * - long gap / punctuation / length limits → new cue
+     * Group timed words into one lyric cue per sung line.
      *
      * @param  list<array<string, mixed>>  $words
      * @return list<array{name: string, timeMs: int, durationMs: int}>
      */
     private function groupWordsIntoPhrases(array $words): array
     {
-        $lineGapMs = 320;   // break line within phrase
-        $phraseGapMs = 750; // start a new cue
-        $maxPhraseMs = 8000;
-        $maxLinesPerPhrase = 2;
-        $maxWordsPerLine = 10;
-
-        $phrases = [];
-        $lines = [];       // list of strings for current phrase
-        $currentLine = []; // words in current line
-        $phraseStart = null;
-        $phraseEnd = null;
-        $lastEnd = null;
-
-        $flushPhrase = function () use (&$phrases, &$lines, &$currentLine, &$phraseStart, &$phraseEnd) {
-            if ($currentLine !== []) {
-                $lines[] = implode(' ', $currentLine);
-                $currentLine = [];
-            }
-            if ($lines === [] || $phraseStart === null) {
-                $lines = [];
-                $phraseStart = null;
-                $phraseEnd = null;
-
-                return;
-            }
-
-            $phrases[] = [
-                'name' => $this->normalizeLyricText(implode("\n", $lines)),
-                'timeMs' => $phraseStart,
-                'durationMs' => max(0, ($phraseEnd ?? $phraseStart) - $phraseStart),
-            ];
-            $lines = [];
-            $phraseStart = null;
-            $phraseEnd = null;
-        };
+        $lineBreakMs = 480;
+        $tokens = [];
 
         foreach ($words as $row) {
             $token = $this->firstString($row, ['word', 'text', 'name', 'token']);
@@ -239,7 +240,7 @@ class SongResultNormalizer
                 continue;
             }
             $token = trim($token);
-            if ($token === '' || $token === '[Music]' || $token === '(Music)') {
+            if ($token === '' || $this->isNoiseLyricToken($token)) {
                 continue;
             }
 
@@ -249,45 +250,175 @@ class SongResultNormalizer
                 $endMs = $startMs;
             }
 
-            $gap = $lastEnd === null ? 0 : max(0, $startMs - $lastEnd);
-            $phraseDuration = $phraseStart === null ? 0 : max(0, $startMs - $phraseStart);
-
-            $startsNewPhrase = $phraseStart !== null && (
-                $gap >= $phraseGapMs
-                || $phraseDuration >= $maxPhraseMs
-                || count($lines) >= $maxLinesPerPhrase && $gap >= $lineGapMs
-            );
-
-            if ($startsNewPhrase) {
-                $flushPhrase();
-            } elseif ($phraseStart !== null && $gap >= $lineGapMs && $currentLine !== []) {
-                $lines[] = implode(' ', $currentLine);
-                $currentLine = [];
-            } elseif ($phraseStart !== null && count($currentLine) >= $maxWordsPerLine) {
-                $lines[] = implode(' ', $currentLine);
-                $currentLine = [];
-                if (count($lines) >= $maxLinesPerPhrase) {
-                    $flushPhrase();
-                }
-            }
-
-            if ($phraseStart === null) {
-                $phraseStart = $startMs;
-            }
-            $currentLine[] = $token;
-            $phraseEnd = $endMs;
-            $lastEnd = $endMs;
-
-            // Punctuation that ends a spoken sentence → close phrase
-            if (preg_match('/[.!?…]$/u', $token) === 1) {
-                $flushPhrase();
-                $lastEnd = $endMs;
-            }
+            $tokens[] = [
+                'text' => $token,
+                'startMs' => $startMs,
+                'endMs' => $endMs,
+            ];
         }
 
-        $flushPhrase();
+        if ($tokens === []) {
+            return [];
+        }
+
+        $rawLines = [];
+        $current = [];
+        $lineStart = null;
+        $lineEnd = null;
+        $lastEnd = null;
+
+        foreach ($tokens as $token) {
+            $gap = $lastEnd === null ? 0 : max(0, $token['startMs'] - $lastEnd);
+            $shouldBreak = $current !== [] && (
+                $gap >= $lineBreakMs
+                || preg_match('/[.!?…]$/u', $current[array_key_last($current)]['text']) === 1
+            );
+
+            if ($shouldBreak) {
+                $rawLines[] = [
+                    'words' => $current,
+                    'startMs' => $lineStart,
+                    'endMs' => $lineEnd,
+                ];
+                $current = [];
+                $lineStart = null;
+                $lineEnd = null;
+            }
+
+            if ($lineStart === null) {
+                $lineStart = $token['startMs'];
+            }
+            $current[] = $token;
+            $lineEnd = $token['endMs'];
+            $lastEnd = $token['endMs'];
+        }
+
+        if ($current !== []) {
+            $rawLines[] = [
+                'words' => $current,
+                'startMs' => $lineStart,
+                'endMs' => $lineEnd,
+            ];
+        }
+
+        $lines = $this->coalesceShortLyricLines($rawLines);
+
+        $phrases = [];
+        foreach ($lines as $line) {
+            $name = $this->normalizeLyricText(implode(' ', array_column($line['words'], 'text')));
+            if ($name === '' || $this->isNoiseLyricToken($name)) {
+                continue;
+            }
+
+            $phrases[] = [
+                'name' => $name,
+                'timeMs' => (int) $line['startMs'],
+                'durationMs' => max(0, (int) $line['endMs'] - (int) $line['startMs']),
+            ];
+        }
 
         return $phrases;
+    }
+
+    /**
+     * Merge stub lines ("Hey,", "I'm", "Music") into the following line.
+     *
+     * @param  list<array{words: list<array{text: string, startMs: int, endMs: int}>, startMs: int|null, endMs: int|null}>  $lines
+     * @return list<array{words: list<array{text: string, startMs: int, endMs: int}>, startMs: int, endMs: int}>
+     */
+    private function coalesceShortLyricLines(array $lines): array
+    {
+        if ($lines === []) {
+            return [];
+        }
+
+        $out = [];
+        $i = 0;
+        $n = count($lines);
+
+        while ($i < $n) {
+            $line = $lines[$i];
+            $text = trim(implode(' ', array_column($line['words'], 'text')));
+
+            if ($this->isNoiseLyricToken($text)) {
+                $i++;
+
+                continue;
+            }
+
+            while (
+                $i + 1 < $n
+                && $this->shouldMergeLyricLineIntoNext($line)
+            ) {
+                $next = $lines[$i + 1];
+                $line = [
+                    'words' => array_merge($line['words'], $next['words']),
+                    'startMs' => $line['startMs'],
+                    'endMs' => $next['endMs'],
+                ];
+                $i++;
+            }
+
+            $out[] = [
+                'words' => $line['words'],
+                'startMs' => (int) $line['startMs'],
+                'endMs' => (int) $line['endMs'],
+            ];
+            $i++;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param  array{words: list<array{text: string, startMs: int, endMs: int}>, startMs: int|null, endMs: int|null}  $line
+     */
+    private function shouldMergeLyricLineIntoNext(array $line): bool
+    {
+        $words = $line['words'];
+        $count = count($words);
+        if ($count === 0) {
+            return true;
+        }
+
+        $text = trim(implode(' ', array_column($words, 'text')));
+        if ($this->isNoiseLyricToken($text)) {
+            return true;
+        }
+
+        // "Hey," / "Oh," / single word stubs
+        if ($count <= 2 && preg_match('/[,;:\-–—]$/u', $text) === 1) {
+            return true;
+        }
+
+        if ($count === 1) {
+            return true;
+        }
+
+        // Very short incomplete fragments
+        if ($count <= 2 && preg_match('/[.!?…]$/u', $text) !== 1) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private function isNoiseLyricToken(string $token): bool
+    {
+        $normalized = strtolower(trim($token, " \t\n\r\0\x0B[](){}♪♫*\"'"));
+
+        return in_array($normalized, [
+            '',
+            'music',
+            'instrumental',
+            'applause',
+            'laughter',
+            'silence',
+            'inaudible',
+            'foreign',
+            '...',
+            '…',
+        ], true);
     }
 
     private function normalizeLyricText(string $text): string
@@ -307,23 +438,34 @@ class SongResultNormalizer
      */
     private function chordRows(array $payload): array
     {
-        foreach (['segments', 'chords', 'chord_segments', 'timeline'] as $key) {
-            if (! empty($payload[$key]) && is_array($payload[$key])) {
-                $rows = $payload[$key];
-                // timeline may mix types
-                if ($key === 'timeline') {
-                    return array_values(array_filter($rows, function ($row) {
-                        if (! is_array($row)) {
-                            return false;
-                        }
-                        $kind = strtolower((string) ($row['kind'] ?? $row['type'] ?? 'chord'));
+        foreach (['chords', 'chord_segments', 'segments', 'timeline'] as $key) {
+            if (empty($payload[$key]) || ! is_array($payload[$key])) {
+                continue;
+            }
 
-                        return in_array($kind, ['chord', 'chords', 'segment'], true)
-                            || isset($row['chord']) || isset($row['label']);
-                    }));
+            $rows = array_values(array_filter($payload[$key], function ($row) use ($key) {
+                if (! is_array($row)) {
+                    return false;
                 }
 
-                return array_values(array_filter($rows, 'is_array'));
+                // Whisper lyric segments live under "segments" too — skip those.
+                if (isset($row['text']) && is_string($row['text']) && ! isset($row['label']) && ! isset($row['chord'])) {
+                    return false;
+                }
+
+                if ($key === 'timeline') {
+                    $kind = strtolower((string) ($row['kind'] ?? $row['type'] ?? 'chord'));
+
+                    return in_array($kind, ['chord', 'chords', 'segment'], true)
+                        || isset($row['chord']) || isset($row['label']);
+                }
+
+                return isset($row['label']) || isset($row['chord']) || isset($row['symbol'])
+                    || ($key !== 'segments');
+            }));
+
+            if ($rows !== []) {
+                return $rows;
             }
         }
 
