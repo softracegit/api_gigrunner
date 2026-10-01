@@ -11,11 +11,19 @@ class SongResultNormalizer
      * @param  array<string, mixed>  $providerPayload
      * @return array{format: int, cues: list<array<string, mixed>>, meta: array<string, mixed>}
      */
-    public function normalize(string $provider, array $providerPayload, ?string $kind = null): array
-    {
+    public function normalize(
+        string $provider,
+        array $providerPayload,
+        ?string $kind = null,
+        string $lyricsGranularity = 'phrase',
+    ): array {
+        $granularity = in_array($lyricsGranularity, ['phrase', 'word'], true)
+            ? $lyricsGranularity
+            : 'phrase';
+
         $cues = match ($provider) {
-            'magic_chords' => $this->fromMagicChords($providerPayload, $kind),
-            default => $this->fromMagicChords($providerPayload, $kind),
+            'magic_chords' => $this->fromMagicChords($providerPayload, $kind, $granularity),
+            default => $this->fromMagicChords($providerPayload, $kind, $granularity),
         };
 
         usort($cues, fn (array $a, array $b) => $a['timeMs'] <=> $b['timeMs']);
@@ -26,6 +34,7 @@ class SongResultNormalizer
             'meta' => [
                 'provider' => $provider,
                 'kind' => $kind,
+                'lyrics_granularity' => $granularity,
                 'bpm' => $this->extractBpm($providerPayload),
                 'key' => $this->extractKey($providerPayload),
                 'durationMs' => $this->extractDurationMs($providerPayload, $cues),
@@ -37,44 +46,134 @@ class SongResultNormalizer
      * @param  array<string, mixed>  $payload
      * @return list<array<string, mixed>>
      */
-    private function fromMagicChords(array $payload, ?string $kind): array
+    private function fromMagicChords(array $payload, ?string $kind, string $lyricsGranularity): array
     {
         $cues = [];
+        $includeChords = $kind === null
+            || $kind === 'analyze'
+            || $kind === 'both';
+        $includeLyrics = $kind === null
+            || $kind === 'transcribe'
+            || $kind === 'both';
 
-        // Chord segments (analyze)
-        foreach ($this->chordRows($payload) as $row) {
-            $name = $this->firstString($row, ['label', 'chord', 'name', 'symbol', 'value']);
-            if ($name === null || trim($name) === '') {
+        if ($includeChords) {
+            foreach ($this->chordRows($payload) as $row) {
+                $name = $this->firstString($row, ['label', 'chord', 'name', 'symbol', 'value']);
+                if ($name === null || trim($name) === '') {
+                    continue;
+                }
+                $name = trim($name);
+                if (in_array(strtoupper($name), ['N', 'N.C.', 'NC', 'NONE', 'X'], true)) {
+                    continue;
+                }
+
+                $startMs = $this->startMs($row);
+                $endMs = $this->endMs($row, $startMs);
+                $cues[] = SongCueFactory::make(
+                    SongCueFactory::KIND_CHORD,
+                    $name,
+                    $startMs,
+                    max(0, $endMs - $startMs),
+                );
+            }
+        }
+
+        if ($includeLyrics) {
+            $lyrics = $lyricsGranularity === 'word'
+                ? $this->lyricWords($payload)
+                : $this->lyricPhrases($payload);
+
+            foreach ($lyrics as $lyric) {
+                $cues[] = SongCueFactory::make(
+                    SongCueFactory::KIND_LYRIC,
+                    $lyric['name'],
+                    $lyric['timeMs'],
+                    $lyric['durationMs'],
+                );
+            }
+        }
+
+        return $cues;
+    }
+
+    /**
+     * One lyric cue per timed word (from top-level words or nested segment words).
+     *
+     * @param  array<string, mixed>  $payload
+     * @return list<array{name: string, timeMs: int, durationMs: int}>
+     */
+    private function lyricWords(array $payload): array
+    {
+        $words = $this->wordRowsIncludingNested($payload);
+        if ($words === []) {
+            // Fall back to phrase segments split by whitespace (no timings per word)
+            $phrases = $this->lyricPhrases($payload);
+            $out = [];
+            foreach ($phrases as $phrase) {
+                $tokens = preg_split('/\s+/u', $phrase['name']) ?: [];
+                foreach ($tokens as $token) {
+                    $token = trim($token);
+                    if ($token === '' || $this->isNoiseLyricToken($token)) {
+                        continue;
+                    }
+                    $out[] = [
+                        'name' => $token,
+                        'timeMs' => $phrase['timeMs'],
+                        'durationMs' => 0,
+                    ];
+                }
+            }
+
+            return $out;
+        }
+
+        $out = [];
+        foreach ($words as $row) {
+            $token = $this->firstString($row, ['word', 'text', 'name', 'token']);
+            if ($token === null) {
                 continue;
             }
-            $name = trim($name);
-            if (in_array(strtoupper($name), ['N', 'N.C.', 'NC', 'NONE', 'X'], true)) {
+            $token = trim($token);
+            if ($token === '' || $this->isNoiseLyricToken($token)) {
                 continue;
             }
 
             $startMs = $this->startMs($row);
             $endMs = $this->endMs($row, $startMs);
-            $cues[] = SongCueFactory::make(
-                SongCueFactory::KIND_CHORD,
-                $name,
-                $startMs,
-                max(0, $endMs - $startMs),
-            );
+            $out[] = [
+                'name' => $token,
+                'timeMs' => $startMs,
+                'durationMs' => max(0, $endMs - $startMs),
+            ];
         }
 
-        // Lyrics as full phrases (never one cue per word)
-        foreach ($this->lyricPhrases($payload) as $phrase) {
-            $cues[] = SongCueFactory::make(
-                SongCueFactory::KIND_LYRIC,
-                $phrase['name'],
-                $phrase['timeMs'],
-                $phrase['durationMs'],
-            );
+        return $out;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return list<array<string, mixed>>
+     */
+    private function wordRowsIncludingNested(array $payload): array
+    {
+        $top = $this->wordRows($payload);
+        if ($top !== []) {
+            return $top;
         }
 
-        unset($kind);
+        $nested = [];
+        foreach ($this->whisperStyleSegments($payload) as $segment) {
+            if (empty($segment['words']) || ! is_array($segment['words'])) {
+                continue;
+            }
+            foreach ($segment['words'] as $word) {
+                if (is_array($word)) {
+                    $nested[] = $word;
+                }
+            }
+        }
 
-        return $cues;
+        return $nested;
     }
 
     /**

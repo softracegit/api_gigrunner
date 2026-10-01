@@ -20,11 +20,12 @@ class SongResultNormalizerTest extends TestCase
             'lines' => [
                 ['text' => 'Line one', 'start' => 1.5, 'end' => 4.2],
             ],
-        ], 'analyze');
+        ], 'both');
 
         $this->assertSame(1, $out['format']);
         $this->assertSame(118.5, $out['meta']['bpm']);
         $this->assertSame('F#m', $out['meta']['key']);
+        $this->assertSame('phrase', $out['meta']['lyrics_granularity']);
 
         $kinds = array_column($out['cues'], 'kind');
         $this->assertContains('chord', $kinds);
@@ -40,6 +41,47 @@ class SongResultNormalizerTest extends TestCase
         $this->assertSame(60, $first['number']);
         $this->assertSame(100, $first['value']);
         $this->assertNotEmpty($first['id']);
+    }
+
+    public function test_analyze_kind_omits_lyrics(): void
+    {
+        $out = (new SongResultNormalizer)->normalize('magic_chords', [
+            'segments' => [
+                ['label' => 'C', 'start' => 0, 'end' => 1],
+            ],
+            'lines' => [
+                ['text' => 'Hello', 'start' => 0.5, 'end' => 1],
+            ],
+        ], 'analyze');
+
+        $this->assertSame(['chord'], array_column($out['cues'], 'kind'));
+    }
+
+    public function test_word_granularity_uses_nested_segment_words(): void
+    {
+        $out = (new SongResultNormalizer)->normalize('magic_chords', [
+            'segments' => [
+                [
+                    'start' => 1.0,
+                    'end' => 2.0,
+                    'text' => 'Hey diamond',
+                    'words' => [
+                        ['start' => 1.0, 'end' => 1.3, 'word' => 'Hey'],
+                        ['start' => 1.4, 'end' => 2.0, 'word' => 'diamond'],
+                    ],
+                ],
+            ],
+        ], 'transcribe', 'word');
+
+        $lyrics = array_values(array_filter(
+            $out['cues'],
+            fn (array $c) => $c['kind'] === 'lyric'
+        ));
+
+        $this->assertSame(['Hey', 'diamond'], array_column($lyrics, 'name'));
+        $this->assertSame(1000, $lyrics[0]['timeMs']);
+        $this->assertSame(300, $lyrics[0]['durationMs']);
+        $this->assertSame('word', $out['meta']['lyrics_granularity']);
     }
 
     public function test_uses_magic_chords_whisper_segment_text_as_lyric_cues(): void

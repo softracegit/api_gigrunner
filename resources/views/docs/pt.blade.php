@@ -3,7 +3,7 @@
         <p class="side-title">Documentação</p>
         <a href="#inicio" class="docs-top active" data-docs-link>Início</a>
 
-        <details class="docs-nav-group" open>
+        <details class="docs-nav-group">
             <summary>Guia de integração</summary>
             <div class="docs-nav-sub">
                 <a href="#guia" data-docs-link>Visão geral</a>
@@ -18,7 +18,7 @@
             </div>
         </details>
 
-        <details class="docs-nav-group" open>
+        <details class="docs-nav-group">
             <summary>Conceitos</summary>
             <div class="docs-nav-sub">
                 <a href="#fluxo" data-docs-link>Fluxo</a>
@@ -32,21 +32,28 @@
         <details class="docs-nav-group" open>
             <summary>Endpoints</summary>
             <div class="docs-nav-sub">
-                <div class="docs-nav-label">Auth</div>
+                <div class="docs-nav-label docs-nav-label--auth">Auth</div>
                 <a href="#health" data-docs-link>GET /health</a>
                 <a href="#register" data-docs-link>POST /register</a>
                 <a href="#login" data-docs-link>POST /login</a>
                 <a href="#me" data-docs-link>GET /me</a>
                 <a href="#logout" data-docs-link>POST /logout</a>
-                <div class="docs-nav-label">Licença</div>
+                <div class="docs-nav-label docs-nav-label--license">Licença</div>
                 <a href="#license" data-docs-link>GET /license</a>
                 <a href="#activate-test" data-docs-link>POST /activate-test</a>
                 <a href="#revoke" data-docs-link>POST /revoke</a>
-                <div class="docs-nav-label">Créditos</div>
+                <div class="docs-nav-label docs-nav-label--credits">Créditos</div>
                 <a href="#credits" data-docs-link>GET /credits</a>
                 <a href="#credits-consume" data-docs-link>POST /consume</a>
                 <a href="#credits-purchase" data-docs-link>POST /purchase-test</a>
-                <div class="docs-nav-label">Áudio</div>
+                <div class="docs-nav-label docs-nav-label--music">Music</div>
+                <a href="#music-create" data-docs-link>POST /music/create</a>
+                <a href="#music-create-status" data-docs-link>GET /music/create/{id}</a>
+                <a href="#music-create-result" data-docs-link>GET /create/result</a>
+                <a href="#music-analyze" data-docs-link>POST /music/analyze</a>
+                <a href="#music-analyze-status" data-docs-link>GET /music/analyze/{id}</a>
+                <a href="#music-analyze-result" data-docs-link>GET /result</a>
+                <div class="docs-nav-label docs-nav-label--audio">Áudio (low-level)</div>
                 <a href="#audio-jobs" data-docs-link>POST /audio/jobs</a>
                 <a href="#audio-jobs-list" data-docs-link>GET /audio/jobs</a>
                 <a href="#audio-job-status" data-docs-link>GET /jobs/{id}</a>
@@ -154,21 +161,23 @@ Authorization: Bearer …
             <p style="margin: 0 0 12px; color: var(--muted); line-height: 1.55;">
                 A app <strong style="color: var(--text);">não</strong> chama a Magic Chords directamente.
                 Usa as URLs GigRunner. O backend escolhe o provider (hoje: Magic Chords).
-                Requer licença válida; consome <strong style="color: var(--text);">1 crédito AI</strong> ao criar o job.
+                Requer licença válida; consome <strong style="color: var(--text);">1 crédito AI por task</strong> ao criar o job.
             </p>
             <div class="code-box">
-<pre>POST /api/v1/audio/jobs
-{ "url": "https://…/song.mp3", "kind": "analyze" }
-  ou multipart: file + kind
+<pre>POST /api/v1/music/analyze
+{ "url": "https://…/song.mp3",
+  "options": { "chords": true, "lyrics": true, "lyrics_granularity": "phrase" } }
 
-→ 201 { "job": { "id", "status", "progress", … }, "credits" }
+→ 201 { "job": { "id", "options", "task_status", "status", … }, "credits" }
 
-GET /api/v1/audio/jobs/{id}           → poll até status=complete
-GET /api/v1/audio/jobs/{id}/result    → { format, cues[], meta }</pre>
+GET /api/v1/music/analyze/{id}           → poll até status=complete
+GET /api/v1/music/analyze/{id}/result    → { format, cues[], meta }
+
+(low-level ainda disponível: POST /audio/jobs com tasks[])</pre>
             </div>
             <p class="hint" style="margin-top: 12px;">
-                <code>kind</code>: <code>analyze</code> (acordes) ou <code>transcribe</code> (letras).
-                O <code>result.cues</code> é o formato da app (<code>chord</code> / <code>lyric</code>).
+                API de produto preferida: <code>/music/analyze</code> com bools <code>chords</code> / <code>lyrics</code>.
+                Stems e <code>/music/create</code> vêm depois.
                 Os jobs demoram — faz poll a cada 2–5s.
             </p>
         </div>
@@ -241,6 +250,8 @@ GET /api/v1/audio/jobs/{id}/result    → { format, cues[], meta }</pre>
 
         <h2 id="endpoints">Endpoints</h2>
 
+        <h3 class="docs-endpoint-section docs-nav-label--auth">Auth</h3>
+
         <div class="endpoint" id="health">
             <div class="endpoint-head">
                 <span class="method get">GET</span>
@@ -290,6 +301,20 @@ GET /api/v1/audio/jobs/{id}/result    → { format, cues[], meta }</pre>
                 <strong>Resposta:</strong> <code>{ user, license, credits }</code>
             </div>
         </div>
+
+        <div class="endpoint" id="logout">
+            <div class="endpoint-head">
+                <span class="method post">POST</span>
+                <span class="endpoint-path">/api/v1/logout</span>
+                <span class="badge">Bearer</span>
+            </div>
+            <div class="endpoint-body">
+                Revoga o token actual.<br>
+                <strong>Resposta:</strong> <code>{ "ok": true }</code>
+            </div>
+        </div>
+
+        <h3 class="docs-endpoint-section docs-nav-label--license">Licença</h3>
 
         <div class="endpoint" id="license">
             <div class="endpoint-head">
@@ -358,6 +383,8 @@ GET /api/v1/audio/jobs/{id}/result    → { format, cues[], meta }</pre>
             </p>
         </div>
 
+        <h3 class="docs-endpoint-section docs-nav-label--credits">Créditos</h3>
+
         <div class="endpoint" id="credits">
             <div class="endpoint-head">
                 <span class="method get">GET</span>
@@ -397,6 +424,117 @@ GET /api/v1/audio/jobs/{id}/result    → { format, cues[], meta }</pre>
             </div>
         </div>
 
+        <h3 class="docs-endpoint-section docs-nav-label--music">Music</h3>
+
+        <div class="endpoint" id="music-create">
+            <div class="endpoint-head">
+                <span class="method post">POST</span>
+                <span class="endpoint-path">/api/v1/music/create</span>
+                <span class="badge">Bearer</span>
+            </div>
+            <div class="endpoint-body">
+                Gera música a partir de um prompt via <strong>ElevenLabs</strong>.
+                <strong>Não</strong> chama o analyze — a app deve fazer POST a <code>/music/analyze</code> depois, se precisar.
+                Consome <strong>2 créditos AI</strong> por defeito (<code>AUDIO_CREDIT_COST_CREATE</code>).<br>
+                <strong>JSON:</strong>
+                <div class="code-box" style="margin-top: 10px;">
+<pre>{
+  "prompt": "alternative rock with fuzz riff",
+  "duration": 30,
+  "force_instrumental": false
+}</pre>
+                </div>
+                <code>duration</code> = segundos (3–600). Ou usa <code>duration_ms</code>.
+                A geração pode demorar (sync por defeito).<br>
+                <strong>201:</strong> <code>{ job, credits }</code> · <strong>503</strong> se faltar a API key
+            </div>
+        </div>
+
+        <div class="endpoint" id="music-create-status">
+            <div class="endpoint-head">
+                <span class="method get">GET</span>
+                <span class="endpoint-path">/api/v1/music/create/{id}</span>
+                <span class="badge">Bearer</span>
+            </div>
+            <div class="endpoint-body">
+                Poll do estado do job de create.
+            </div>
+        </div>
+
+        <div class="endpoint" id="music-create-result">
+            <div class="endpoint-head">
+                <span class="method get">GET</span>
+                <span class="endpoint-path">/api/v1/music/create/{id}/result</span>
+                <span class="badge">Bearer</span>
+            </div>
+            <div class="endpoint-body">
+                Devolve metadados do áudio + <code>audio_url</code> assinada (podes usar como input de <code>/music/analyze</code>).
+                <div class="code-box" style="margin-top: 10px;">
+<pre>{
+  "audio_url": "https://…/api/v1/music/create/{id}/audio?signature=…",
+  "content_type": "audio/mpeg",
+  "duration_ms": 30000,
+  "prompt": "…",
+  "provider": "elevenlabs"
+}</pre>
+                </div>
+            </div>
+        </div>
+
+        <div class="endpoint" id="music-analyze">
+            <div class="endpoint-head">
+                <span class="method post">POST</span>
+                <span class="endpoint-path">/api/v1/music/analyze</span>
+                <span class="badge">Bearer</span>
+            </div>
+            <div class="endpoint-body">
+                API de produto para análise de acordes + transcrição de letras (Magic Chords)
+                e separação de stems (ElevenLabs).
+                1 crédito AI por opção chords/lyrics; stems custam <code>AUDIO_CREDIT_COST_STEMS</code> (default 2).<br>
+                <strong>JSON:</strong>
+                <div class="code-box" style="margin-top: 10px;">
+<pre>{
+  "url": "https://…/song.mp3",
+  "options": {
+    "chords": true,
+    "lyrics": true,
+    "lyrics_granularity": "phrase",
+    "separate_stems": ["vocals", "drums", "bass", "guitar"]
+  }
+}</pre>
+                </div>
+                Ou <strong>multipart:</strong> <code>file</code> + mesmas options.<br>
+                Defaults: <code>chords=true</code>, <code>lyrics=true</code> (excepto se só enviares <code>separate_stems</code>).
+                É preciso pelo menos chords, lyrics ou separate_stems.
+                Stems permitidos: <code>vocals</code>, <code>instrumental</code>, <code>drums</code>, <code>bass</code>, <code>guitar</code>, <code>other</code>, <code>piano</code>.<br>
+                <strong>201:</strong> <code>{ job: { id, options, task_status, status, … }, credits }</code>
+            </div>
+        </div>
+
+        <div class="endpoint" id="music-analyze-status">
+            <div class="endpoint-head">
+                <span class="method get">GET</span>
+                <span class="endpoint-path">/api/v1/music/analyze/{id}</span>
+                <span class="badge">Bearer</span>
+            </div>
+            <div class="endpoint-body">
+                Poll do estado. <code>task_status.chords</code> / <code>task_status.lyrics</code> por opção.
+            </div>
+        </div>
+
+        <div class="endpoint" id="music-analyze-result">
+            <div class="endpoint-head">
+                <span class="method get">GET</span>
+                <span class="endpoint-path">/api/v1/music/analyze/{id}/result</span>
+                <span class="badge">Bearer</span>
+            </div>
+            <div class="endpoint-body">
+                Cues misturados (<code>chord</code> + <code>lyric</code>) e, se pedido, mapa <code>stems</code> com URLs assinadas.
+            </div>
+        </div>
+
+        <h3 class="docs-endpoint-section docs-nav-label--audio">Áudio (low-level)</h3>
+
         <div class="endpoint" id="audio-jobs">
             <div class="endpoint-head">
                 <span class="method post">POST</span>
@@ -404,10 +542,13 @@ GET /api/v1/audio/jobs/{id}/result    → { format, cues[], meta }</pre>
                 <span class="badge">Bearer</span>
             </div>
             <div class="endpoint-body">
-                Cria análise/transcrição. Provider actual: <strong>Magic Chords</strong>. Consome 1 crédito AI.<br>
-                <strong>JSON:</strong> <code>{ "url": "https://…", "kind": "analyze"|"transcribe" }</code><br>
-                <strong>multipart:</strong> <code>file</code> + <code>kind</code><br>
-                <strong>201:</strong> <code>{ job, credits }</code> · <strong>402</strong> sem créditos · <strong>403</strong> sem licença
+                Cria análise e/ou transcrição. Provider actual: <strong>Magic Chords</strong>.
+                Consome <strong>1 crédito AI por task</strong> (<code>analyze</code> + <code>transcribe</code> = 2).<br>
+                <strong>JSON:</strong> <code>{ "url", "tasks": ["analyze","transcribe"], "lyrics_granularity": "phrase"|"word" }</code><br>
+                Legacy: <code>kind</code> = <code>analyze</code>|<code>transcribe</code>|<code>both</code>.<br>
+                <strong>multipart:</strong> <code>file</code> + mesmos campos<br>
+                <strong>201:</strong> <code>{ job: { id, tasks, task_status, options, … }, credits }</code>
+                · <strong>402</strong> sem créditos · <strong>403</strong> sem licença
             </div>
         </div>
 
@@ -419,8 +560,8 @@ GET /api/v1/audio/jobs/{id}/result    → { format, cues[], meta }</pre>
             </div>
             <div class="endpoint-body">
                 Lista os jobs/áudios do utilizador autenticado (histórico de uploads e URLs).<br>
-                <strong>Query:</strong> <code>per_page</code>?, <code>kind</code>?, <code>status</code>?<br>
-                <strong>Resposta:</strong> <code>{ jobs: [{ id, kind, status, source: { type, name, url }, … }], meta }</code>
+                <strong>Query:</strong> <code>per_page</code>?, <code>kind</code> (<code>analyze</code>|<code>transcribe</code>|<code>both</code>)?, <code>status</code>?<br>
+                <strong>Resposta:</strong> <code>{ jobs: [{ id, kind, tasks, task_status, options, status, source, … }], meta }</code>
             </div>
         </div>
 
@@ -431,7 +572,8 @@ GET /api/v1/audio/jobs/{id}/result    → { format, cues[], meta }</pre>
                 <span class="badge">Bearer</span>
             </div>
             <div class="endpoint-body">
-                Estado do job (<code>queued</code> / <code>processing</code> / <code>complete</code> / <code>failed</code>) + progresso.
+                Estado do job (<code>queued</code> / <code>processing</code> / <code>complete</code> / <code>failed</code>)
+                + progresso global + <code>task_status</code> por task.
             </div>
         </div>
 
@@ -442,7 +584,7 @@ GET /api/v1/audio/jobs/{id}/result    → { format, cues[], meta }</pre>
                 <span class="badge">Bearer</span>
             </div>
             <div class="endpoint-body">
-                Resultado normalizado para a app (independente do provider).<br>
+                Resultado normalizado para a app (independente do provider). Jobs multi-task devolvem cues misturados.<br>
                 <strong>Resposta:</strong>
                 <div class="code-box" style="margin-top: 10px;">
 <pre>{
@@ -469,23 +611,20 @@ GET /api/v1/audio/jobs/{id}/result    → { format, cues[], meta }</pre>
       "durationMs": 6545
     }
   ],
-  "meta": { "provider": "magic_chords", "bpm": 120, "key": "F#m", "durationMs": 552000 }
+  "meta": {
+    "provider": "magic_chords",
+    "kind": "both",
+    "tasks": ["analyze", "transcribe"],
+    "lyrics_granularity": "phrase",
+    "bpm": 120,
+    "key": "F#m",
+    "durationMs": 552000
+  }
 }</pre>
                 </div>
                 <code>kind</code> no cue: <code>chord</code> ou <code>lyric</code>.
+                Com <code>lyrics_granularity=word</code>, cada cue de letra é uma palavra.
                 <strong>409</strong> se ainda não estiver <code>complete</code>.
-            </div>
-        </div>
-
-        <div class="endpoint" id="logout">
-            <div class="endpoint-head">
-                <span class="method post">POST</span>
-                <span class="endpoint-path">/api/v1/logout</span>
-                <span class="badge">Bearer</span>
-            </div>
-            <div class="endpoint-body">
-                Revoga o token actual.<br>
-                <strong>Resposta:</strong> <code>{ "ok": true }</code>
             </div>
         </div>
 

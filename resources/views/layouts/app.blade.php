@@ -516,11 +516,36 @@
         .docs-nav-sub a.active { color: var(--text); background: var(--active); }
         .docs-nav-label {
             font-size: 0.68rem;
-            letter-spacing: 0.06em;
+            letter-spacing: 0.08em;
             text-transform: uppercase;
-            color: var(--muted);
-            padding: 8px 10px 4px;
-            opacity: 0.85;
+            font-weight: 700;
+            padding: 12px 10px 4px;
+            opacity: 1;
+        }
+        .docs-nav-label:first-child {
+            padding-top: 4px;
+        }
+        /* Section colours — Auth uses logo yellow (--brand) */
+        .docs-nav-label--auth { color: var(--brand); }
+        .docs-nav-label--license { color: #7dd3c0; }
+        .docs-nav-label--credits { color: #c4a1ff; }
+        .docs-nav-label--music { color: #6ec8ff; }
+        .docs-nav-label--audio { color: #f0a0b8; }
+        html[data-theme="light"] .docs-nav-label--license { color: #1a9a82; }
+        html[data-theme="light"] .docs-nav-label--credits { color: #7b5cc8; }
+        html[data-theme="light"] .docs-nav-label--music { color: #1a7fd4; }
+        html[data-theme="light"] .docs-nav-label--audio { color: #c45a7a; }
+        .docs-endpoint-section {
+            font-size: 0.78rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            font-weight: 700;
+            margin: 2rem 0 0.85rem;
+            max-width: 780px;
+        }
+        .docs-endpoint-section:first-of-type,
+        h2#endpoints + .docs-endpoint-section {
+            margin-top: 1.25rem;
         }
         .docs-side .docs-footer-link {
             display: block;

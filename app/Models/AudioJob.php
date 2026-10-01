@@ -20,10 +20,21 @@ class AudioJob extends Model
 
     public const KIND_TRANSCRIBE = 'transcribe';
 
+    public const KIND_STEMS = 'stems';
+
+    public const KIND_CREATE = 'create';
+
+    public const GRANULARITY_PHRASE = 'phrase';
+
+    public const GRANULARITY_WORD = 'word';
+
     protected $fillable = [
         'uuid',
         'user_id',
         'kind',
+        'tasks',
+        'task_state',
+        'options',
         'provider',
         'status',
         'external_job_id',
@@ -44,6 +55,9 @@ class AudioJob extends Model
             'progress' => 'integer',
             'credits_spent' => 'integer',
             'result' => 'array',
+            'tasks' => 'array',
+            'task_state' => 'array',
+            'options' => 'array',
         ];
     }
 
@@ -61,15 +75,54 @@ class AudioJob extends Model
         return $this->belongsTo(User::class);
     }
 
+    /**
+     * @return list<string>
+     */
+    public function taskList(): array
+    {
+        if (is_array($this->tasks) && $this->tasks !== []) {
+            return array_values(array_unique($this->tasks));
+        }
+
+        return [$this->kind ?: self::KIND_ANALYZE];
+    }
+
+    public function lyricsGranularity(): string
+    {
+        $value = $this->options['lyrics_granularity'] ?? self::GRANULARITY_PHRASE;
+
+        return in_array($value, [self::GRANULARITY_PHRASE, self::GRANULARITY_WORD], true)
+            ? $value
+            : self::GRANULARITY_PHRASE;
+    }
+
     public function toStatusArray(): array
     {
+        $tasks = $this->taskList();
+        $taskState = is_array($this->task_state) ? $this->task_state : [];
+
+        $tasksOut = [];
+        foreach ($tasks as $task) {
+            $state = is_array($taskState[$task] ?? null) ? $taskState[$task] : [];
+            $tasksOut[$task] = [
+                'status' => $state['status'] ?? $this->status,
+                'progress' => (int) ($state['progress'] ?? $this->progress),
+                'message' => $state['message'] ?? $this->message,
+                'error' => $state['error'] ?? null,
+            ];
+        }
+
         return [
             'id' => $this->uuid,
-            'kind' => $this->kind,
+            'kind' => count($tasks) === 1 ? $tasks[0] : 'both',
+            'tasks' => $tasks,
+            'task_status' => $tasksOut,
             'status' => $this->status,
             'progress' => $this->progress,
             'message' => $this->message,
-            'provider' => $this->provider,
+            'options' => [
+                'lyrics_granularity' => $this->lyricsGranularity(),
+            ],
             'credits_spent' => $this->credits_spent,
             'source' => [
                 'type' => $this->source_type,

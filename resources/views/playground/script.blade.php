@@ -189,6 +189,42 @@
         document.getElementById('btnLicense').addEventListener('click', () => callApi('GET', '/license', null, true));
         document.getElementById('btnCredits').addEventListener('click', () => callApi('GET', '/credits', null, true));
         document.getElementById('btnAudioList').addEventListener('click', () => callApi('GET', '/audio/jobs', null, true));
+
+        document.getElementById('btnMusicCreate').addEventListener('click', async function () {
+            const json = await callApi('POST', '/music/create', {
+                prompt: document.getElementById('createPrompt').value,
+                duration: Number(document.getElementById('createDuration').value || 12),
+                force_instrumental: document.getElementById('createInstrumental').checked,
+            }, true);
+            if (json && json.job && json.job.id) {
+                document.getElementById('createJobId').value = json.job.id;
+            }
+            if (json && json.result && json.result.audio_url) {
+                document.getElementById('audioUrl').value = json.result.audio_url;
+            }
+        });
+        document.getElementById('btnMusicCreateStatus').addEventListener('click', function () {
+            const id = document.getElementById('createJobId').value.trim();
+            if (!id) {
+                statusLine.className = 'status-line err';
+                statusLine.textContent = i18n.needJobId;
+                return;
+            }
+            callApi('GET', '/music/create/' + encodeURIComponent(id), null, true);
+        });
+        document.getElementById('btnMusicCreateResult').addEventListener('click', async function () {
+            const id = document.getElementById('createJobId').value.trim();
+            if (!id) {
+                statusLine.className = 'status-line err';
+                statusLine.textContent = i18n.needJobId;
+                return;
+            }
+            const json = await callApi('GET', '/music/create/' + encodeURIComponent(id) + '/result', null, true);
+            if (json && json.result && json.result.audio_url) {
+                document.getElementById('audioUrl').value = json.result.audio_url;
+            }
+        });
+
         document.getElementById('btnActivateLicense').addEventListener('click', () => callApi('POST', '/license/activate-test', {}, true));
         document.getElementById('btnRevokeLicense').addEventListener('click', () => callApi('POST', '/license/revoke', {}, true));
         document.getElementById('btnConsumeAi').addEventListener('click', () => callApi('POST', '/credits/consume', { type: 'ai', amount: 1, reason: 'playground' }, true));
@@ -200,10 +236,20 @@
         });
 
         document.getElementById('btnAudioCreate').addEventListener('click', async function () {
-            const json = await callApi('POST', '/audio/jobs', {
+            const stemsRaw = (document.getElementById('optStems')?.value || '').trim();
+            const stems = stemsRaw
+                ? stemsRaw.split(',').map(function (s) { return s.trim(); }).filter(Boolean)
+                : [];
+            const body = {
                 url: document.getElementById('audioUrl').value,
-                kind: document.getElementById('audioKind').value,
-            }, true);
+                options: {
+                    chords: document.getElementById('optChords').checked,
+                    lyrics: document.getElementById('optLyrics').checked,
+                    lyrics_granularity: document.getElementById('audioGranularity').value,
+                    separate_stems: stems,
+                },
+            };
+            const json = await callApi('POST', '/music/analyze', body, true);
             if (json && json.job && json.job.id) {
                 document.getElementById('audioJobId').value = json.job.id;
             }
@@ -223,15 +269,23 @@
                 return;
             }
 
+            const stemsRaw = (document.getElementById('optStems')?.value || '').trim();
             const form = new FormData();
             form.append('file', input.files[0]);
-            form.append('kind', document.getElementById('audioKind').value);
+            form.append('chords', document.getElementById('optChords').checked ? '1' : '0');
+            form.append('lyrics', document.getElementById('optLyrics').checked ? '1' : '0');
+            form.append('lyrics_granularity', document.getElementById('audioGranularity').value);
+            if (stemsRaw) {
+                stemsRaw.split(',').map(function (s) { return s.trim(); }).filter(Boolean).forEach(function (stem) {
+                    form.append('separate_stems[]', stem);
+                });
+            }
 
             statusLine.className = 'status-line';
             statusLine.textContent = i18n.uploading;
 
             try {
-                const res = await fetch(baseUrl + '/audio/jobs', {
+                const res = await fetch(baseUrl + '/music/analyze', {
                     method: 'POST',
                     headers: {
                         'Accept': 'application/json',
@@ -264,7 +318,7 @@
                 statusLine.textContent = i18n.needJobId;
                 return;
             }
-            callApi('GET', '/audio/jobs/' + encodeURIComponent(id), null, true);
+            callApi('GET', '/music/analyze/' + encodeURIComponent(id), null, true);
         });
         document.getElementById('btnAudioResult').addEventListener('click', function () {
             const id = document.getElementById('audioJobId').value.trim();
@@ -273,7 +327,7 @@
                 statusLine.textContent = i18n.needJobId;
                 return;
             }
-            callApi('GET', '/audio/jobs/' + encodeURIComponent(id) + '/result', null, true);
+            callApi('GET', '/music/analyze/' + encodeURIComponent(id) + '/result', null, true);
         });
 
         document.getElementById('btnLogout').addEventListener('click', async function () {

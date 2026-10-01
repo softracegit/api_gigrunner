@@ -92,8 +92,33 @@
             </div>
 
             <div class="card">
-                <h2>Audio (Magic Chords)</h2>
-                <p class="sub">Needs licence + credits. Consumes 1 AI when creating the job.</p>
+                <h2>Music create</h2>
+                <p class="sub">ElevenLabs — generate from prompt (2 AI). Does not call analyze.</p>
+                <div class="field">
+                    <label for="createPrompt">Prompt</label>
+                    <input id="createPrompt" type="text" value="alternative rock with fuzz riff">
+                </div>
+                <div class="field">
+                    <label for="createDuration">Duration (seconds)</label>
+                    <input id="createDuration" type="number" min="3" max="600" value="12">
+                </div>
+                <div class="field">
+                    <label><input type="checkbox" id="createInstrumental"> force instrumental</label>
+                </div>
+                <div class="field">
+                    <label for="createJobId">Create job ID</label>
+                    <input id="createJobId" type="text" placeholder="filled after create" value="">
+                </div>
+                <div class="pg-actions">
+                    <button type="button" class="btn" id="btnMusicCreate">POST /music/create</button>
+                    <button type="button" class="btn secondary" id="btnMusicCreateStatus">GET status</button>
+                    <button type="button" class="btn secondary" id="btnMusicCreateResult">GET result</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Music analyze</h2>
+                <p class="sub">Chords + lyrics (Magic Chords) and/or stems (ElevenLabs).</p>
                 <div class="field">
                     <label for="audioFile">MP3 file (or audio)</label>
                     <input id="audioFile" type="file" accept="audio/mpeg,audio/mp3,audio/*,.mp3,.wav,.flac,.ogg,.m4a">
@@ -102,11 +127,19 @@
                     <label for="audioUrl">…or audio URL</label>
                     <input id="audioUrl" type="text" value="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3">
                 </div>
+                <div class="field" style="display:flex;gap:16px;flex-wrap:wrap;">
+                    <label><input type="checkbox" id="optChords" checked> chords</label>
+                    <label><input type="checkbox" id="optLyrics" checked> lyrics</label>
+                </div>
                 <div class="field">
-                    <label for="audioKind">Kind</label>
-                    <select id="audioKind">
-                        <option value="analyze">analyze (chords / tempo / key)</option>
-                        <option value="transcribe">transcribe (lyrics)</option>
+                    <label for="optStems">Stems (comma-separated)</label>
+                    <input id="optStems" type="text" placeholder="vocals,drums,bass,guitar" value="vocals,guitar,bass,drums">
+                </div>
+                <div class="field">
+                    <label for="audioGranularity">Lyrics granularity</label>
+                    <select id="audioGranularity">
+                        <option value="phrase">phrase (default)</option>
+                        <option value="word">word</option>
                     </select>
                 </div>
                 <div class="field">

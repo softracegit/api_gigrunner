@@ -22,7 +22,7 @@ class AudioJobController extends Controller
     {
         $data = $request->validate([
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
-            'kind' => ['sometimes', 'in:analyze,transcribe'],
+            'kind' => ['sometimes', 'in:analyze,transcribe,both'],
             'status' => ['sometimes', 'in:queued,processing,complete,failed'],
         ]);
 
@@ -31,7 +31,14 @@ class AudioJobController extends Controller
             ->orderByDesc('id');
 
         if (! empty($data['kind'])) {
-            $query->where('kind', $data['kind']);
+            if ($data['kind'] === 'both') {
+                $query->where('kind', 'both');
+            } else {
+                $query->where(function ($q) use ($data) {
+                    $q->where('kind', $data['kind'])
+                        ->orWhereJsonContains('tasks', $data['kind']);
+                });
+            }
         }
 
         if (! empty($data['status'])) {
@@ -53,9 +60,9 @@ class AudioJobController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        $kind = $request->input('kind', AudioJob::KIND_ANALYZE);
-
         try {
+            $options = $this->extractOptions($request);
+
             if ($request->hasFile('file')) {
                 $request->validate([
                     'file' => [
@@ -63,24 +70,38 @@ class AudioJobController extends Controller
                         'file',
                         'max:'.config('audio.upload.max_kb'),
                     ],
-                    'kind' => ['sometimes', 'in:analyze,transcribe'],
+                    'kind' => ['sometimes', 'in:analyze,transcribe,both'],
+                    'tasks' => ['sometimes', 'array', 'min:1'],
+                    'tasks.*' => ['string', 'in:analyze,transcribe,both'],
+                    'lyrics_granularity' => ['sometimes', 'in:phrase,word'],
+                    'options' => ['sometimes', 'array'],
+                    'options.lyrics_granularity' => ['sometimes', 'in:phrase,word'],
                 ]);
 
                 $job = $this->audioJobs->createFromUpload(
                     $request->user(),
                     $request->file('file'),
-                    $kind,
+                    $request->input('kind'),
+                    $this->extractTasks($request),
+                    $options,
                 );
             } else {
-                $data = $request->validate([
+                $request->validate([
                     'url' => ['required', 'url'],
-                    'kind' => ['sometimes', 'in:analyze,transcribe'],
+                    'kind' => ['sometimes', 'in:analyze,transcribe,both'],
+                    'tasks' => ['sometimes', 'array', 'min:1'],
+                    'tasks.*' => ['string', 'in:analyze,transcribe,both'],
+                    'lyrics_granularity' => ['sometimes', 'in:phrase,word'],
+                    'options' => ['sometimes', 'array'],
+                    'options.lyrics_granularity' => ['sometimes', 'in:phrase,word'],
                 ]);
 
                 $job = $this->audioJobs->createFromUrl(
                     $request->user(),
-                    $data['url'],
-                    $data['kind'] ?? $kind,
+                    (string) $request->input('url'),
+                    $request->input('kind'),
+                    $this->extractTasks($request),
+                    $options,
                 );
             }
         } catch (InvalidArgumentException $e) {
@@ -129,6 +150,51 @@ class AudioJobController extends Controller
             'job' => $job->fresh()->toStatusArray(),
             'result' => $result,
         ]);
+    }
+
+    /**
+     * @return list<string>|null
+     */
+    private function extractTasks(Request $request): ?array
+    {
+        if (! $request->has('tasks')) {
+            return null;
+        }
+
+        $tasks = $request->input('tasks');
+
+        // multipart may send tasks as JSON string or repeated fields
+        if (is_string($tasks)) {
+            $decoded = json_decode($tasks, true);
+            if (is_array($decoded)) {
+                return $decoded;
+            }
+
+            return array_values(array_filter(array_map('trim', explode(',', $tasks))));
+        }
+
+        return is_array($tasks) ? $tasks : null;
+    }
+
+    /**
+     * @return array{lyrics_granularity?: string}
+     */
+    private function extractOptions(Request $request): array
+    {
+        $options = $request->input('options');
+        if (is_string($options)) {
+            $decoded = json_decode($options, true);
+            $options = is_array($decoded) ? $decoded : [];
+        }
+        if (! is_array($options)) {
+            $options = [];
+        }
+
+        if ($request->filled('lyrics_granularity')) {
+            $options['lyrics_granularity'] = $request->input('lyrics_granularity');
+        }
+
+        return $options;
     }
 
     private function findOwnedJob(Request $request, string $uuid): AudioJob

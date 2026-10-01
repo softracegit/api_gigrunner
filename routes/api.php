@@ -4,6 +4,8 @@ use App\Http\Controllers\Api\V1\AudioJobController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CreditController;
 use App\Http\Controllers\Api\V1\LicenseController;
+use App\Http\Controllers\Api\V1\MusicAnalyzeController;
+use App\Http\Controllers\Api\V1\MusicCreateController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -40,6 +42,25 @@ Route::prefix('v1')->group(function () {
         Route::post('/audio/jobs', [AudioJobController::class, 'store']);
         Route::get('/audio/jobs/{uuid}', [AudioJobController::class, 'show']);
         Route::get('/audio/jobs/{uuid}/result', [AudioJobController::class, 'result']);
+
+        // Product API — create (ElevenLabs) + analyze (Magic Chords). Stems later.
+        Route::post('/music/create', [MusicCreateController::class, 'store']);
+        Route::get('/music/create/{uuid}', [MusicCreateController::class, 'show']);
+        Route::get('/music/create/{uuid}/result', [MusicCreateController::class, 'result']);
+
+        Route::post('/music/analyze', [MusicAnalyzeController::class, 'store']);
+        Route::get('/music/analyze/{uuid}', [MusicAnalyzeController::class, 'show']);
+        Route::get('/music/analyze/{uuid}/result', [MusicAnalyzeController::class, 'result']);
+
         Route::post('/logout', [AuthController::class, 'logout']);
     });
+
+    // Signed URL for generated audio (no auth — Magic Chords / clients fetch by URL)
+    Route::get('/music/create/{uuid}/audio', [MusicCreateController::class, 'audio'])
+        ->middleware('signed')
+        ->name('music.create.audio');
+
+    Route::get('/music/analyze/{uuid}/stems/{stem}', [MusicAnalyzeController::class, 'stem'])
+        ->middleware('signed')
+        ->name('music.analyze.stem');
 });
