@@ -9,8 +9,17 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 /*
-| Safety net: if a PollAudioJobStatus chain dies, cron still refreshes active jobs
-| once per minute (and broadcasts via model updated → Pusher).
-| Prefer a continuous `php artisan queue:work` for ~3s updates.
+| Shared-hosting friendly: one cron (`schedule:run` every minute) keeps
+| Pusher job updates alive without a long-running `queue:work` process.
+|
+| 1) Drain the database queue (PollAudioJobStatus chains, create jobs, …)
+| 2) Safety-net refresh of any stuck audio jobs → broadcasts via Pusher
+|
+| On a VPS, prefer Supervisor + continuous `php artisan queue:work` instead
+| (finer ~3s cadence). This schedule still works as a backup.
 */
+Schedule::command('queue:work --stop-when-empty --max-time=50 --tries=1')
+    ->everyMinute()
+    ->withoutOverlapping(2);
+
 Schedule::command('audio:refresh-active')->everyMinute();
