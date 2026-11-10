@@ -47,6 +47,19 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Background status polling (Pusher-friendly)
+    |--------------------------------------------------------------------------
+    | Requires `php artisan queue:work` (database queue). Each active job
+    | re-queues itself every interval_seconds until complete/failed.
+    */
+    'poll' => [
+        'enabled' => filter_var(env('AUDIO_JOB_POLL_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
+        'interval_seconds' => (int) env('AUDIO_JOB_POLL_INTERVAL', 3),
+        'max_attempts' => (int) env('AUDIO_JOB_POLL_MAX_ATTEMPTS', 300),
+    ],
+
     'upload' => [
         'disk' => env('AUDIO_UPLOAD_DISK', 'local'),
         'max_kb' => (int) env('AUDIO_UPLOAD_MAX_KB', 51200), // 50 MB

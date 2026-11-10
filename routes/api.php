@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\V1\AudioJobController;
 use App\Http\Controllers\Api\V1\AuthController;
+use App\Http\Controllers\Api\V1\BroadcastTestController;
 use App\Http\Controllers\Api\V1\CreditController;
 use App\Http\Controllers\Api\V1\LicenseController;
 use App\Http\Controllers\Api\V1\MusicAnalyzeController;
@@ -51,6 +52,9 @@ Route::prefix('v1')->group(function () {
         Route::post('/music/analyze', [MusicAnalyzeController::class, 'store']);
         Route::get('/music/analyze/{uuid}', [MusicAnalyzeController::class, 'show']);
         Route::get('/music/analyze/{uuid}/result', [MusicAnalyzeController::class, 'result']);
+
+        // Pusher smoke-test (remove or gate in production later)
+        Route::post('/broadcast/ping', [BroadcastTestController::class, 'ping']);
 
         Route::post('/logout', [AuthController::class, 'logout']);
     });

@@ -2,6 +2,7 @@
 
 namespace App\Services\Audio;
 
+use App\Jobs\PollAudioJobStatus;
 use App\Models\AudioJob;
 use App\Models\User;
 use App\Services\CreditService;
@@ -62,7 +63,10 @@ class AudioJobService
             $this->failSubmitAndRefund($job, $user, $cost, $e->getMessage());
         }
 
-        return $job->fresh();
+        $job = $job->fresh();
+        $this->scheduleStatusPolling($job);
+
+        return $job;
     }
 
     /**
@@ -106,7 +110,10 @@ class AudioJobService
             $this->failSubmitAndRefund($job, $user, $cost, $e->getMessage());
         }
 
-        return $job->fresh();
+        $job = $job->fresh();
+        $this->scheduleStatusPolling($job);
+
+        return $job;
     }
 
     public function refresh(AudioJob $job): AudioJob
@@ -919,6 +926,22 @@ class AudioJobService
             'stems' => $extracted,
         ];
         $job->task_state = $taskState;
+    }
+
+    private function scheduleStatusPolling(?AudioJob $job): void
+    {
+        if (! $job || ! config('audio.poll.enabled', true)) {
+            return;
+        }
+
+        if (in_array($job->status, [AudioJob::STATUS_COMPLETE, AudioJob::STATUS_FAILED], true)) {
+            return;
+        }
+
+        $interval = max(1, (int) config('audio.poll.interval_seconds', 3));
+
+        PollAudioJobStatus::dispatch($job->id)
+            ->delay(now()->addSeconds($interval));
     }
 
     private function scheduleStemsProcessing(AudioJob $job): void

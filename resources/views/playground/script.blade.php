@@ -1,6 +1,8 @@
+<script src="https://js.pusher.com/8.4.0/pusher.min.js"></script>
 <script>
     (function () {
         const i18n = @json($i18n);
+        const pusherCfg = @json($pusher ?? ['enabled' => false]);
         const STORAGE_KEY = 'gigrunner_api_token';
         const WIDTHS_KEY = 'gigrunner_pg_widths';
         const MIN = 180;
@@ -340,6 +342,133 @@
             statusLine.textContent = i18n.tokenCleared;
             responseBox.textContent = '{}';
         });
+
+        // --- Pusher / WebSocket smoke test ---
+        let pusherClient = null;
+        let pusherChannel = null;
+        const wsStatus = document.getElementById('wsStatus');
+        const wsJobIdInput = document.getElementById('wsJobId');
+
+        function setWsStatus(text, ok) {
+            if (!wsStatus) return;
+            wsStatus.textContent = text;
+            wsStatus.style.color = ok === true ? 'var(--ok, #16a34a)' : (ok === false ? 'var(--danger, #dc2626)' : '');
+        }
+
+        function disconnectPusher() {
+            try {
+                if (pusherChannel && pusherClient) {
+                    pusherClient.unsubscribe(pusherChannel.name);
+                }
+                if (pusherClient) {
+                    pusherClient.disconnect();
+                }
+            } catch (e) { /* ignore */ }
+            pusherChannel = null;
+            pusherClient = null;
+            setWsStatus(i18n.wsDisconnected);
+        }
+
+        function subscribePusher(jobId) {
+            if (!pusherCfg.enabled || !pusherCfg.key) {
+                statusLine.className = 'status-line err';
+                statusLine.textContent = i18n.pusherMissing;
+                return;
+            }
+            const token = getToken();
+            if (!token) {
+                statusLine.className = 'status-line err';
+                statusLine.textContent = i18n.needAuth;
+                return;
+            }
+            if (!jobId) {
+                statusLine.className = 'status-line err';
+                statusLine.textContent = i18n.wsNeedJobId;
+                return;
+            }
+            if (typeof Pusher === 'undefined') {
+                statusLine.className = 'status-line err';
+                statusLine.textContent = i18n.wsError + ' (Pusher JS)';
+                return;
+            }
+
+            disconnectPusher();
+            setWsStatus(i18n.wsConnecting);
+
+            pusherClient = new Pusher(pusherCfg.key, {
+                cluster: pusherCfg.cluster || 'eu',
+                forceTLS: true,
+                authEndpoint: pusherCfg.authEndpoint,
+                auth: {
+                    headers: {
+                        Authorization: 'Bearer ' + token,
+                        Accept: 'application/json',
+                    },
+                },
+            });
+
+            const channelName = 'private-audio-jobs.' + jobId;
+            pusherChannel = pusherClient.subscribe(channelName);
+
+            pusherChannel.bind('pusher:subscription_succeeded', function () {
+                setWsStatus(i18n.wsSubscribed + ' · ' + channelName, true);
+                statusLine.className = 'status-line ok';
+                statusLine.textContent = i18n.wsSubscribed;
+            });
+            pusherChannel.bind('pusher:subscription_error', function (statusCode) {
+                setWsStatus(i18n.wsError + ' · auth ' + statusCode, false);
+                statusLine.className = 'status-line err';
+                statusLine.textContent = i18n.wsError;
+                responseBox.textContent = JSON.stringify({ subscription_error: statusCode, channel: channelName }, null, 2);
+            });
+            pusherChannel.bind('AudioJobStatusUpdated', function (payload) {
+                statusLine.className = 'status-line ok';
+                statusLine.textContent = i18n.wsEvent + ' · ' + (payload?.job?.status || '?') + ' ' + (payload?.job?.progress ?? '') + '%';
+                responseBox.textContent = JSON.stringify({ event: 'AudioJobStatusUpdated', payload: payload }, null, 2);
+                if (payload?.job?.id) {
+                    document.getElementById('audioJobId').value = payload.job.id;
+                    if (wsJobIdInput) wsJobIdInput.value = payload.job.id;
+                }
+            });
+        }
+
+        document.getElementById('btnWsSubscribe')?.addEventListener('click', function () {
+            const id = (wsJobIdInput?.value || document.getElementById('audioJobId')?.value || '').trim();
+            if (wsJobIdInput && id) wsJobIdInput.value = id;
+            subscribePusher(id);
+        });
+        document.getElementById('btnWsUnsubscribe')?.addEventListener('click', function () {
+            disconnectPusher();
+            statusLine.className = 'status-line';
+            statusLine.textContent = i18n.wsDisconnected;
+        });
+        document.getElementById('btnWsPing')?.addEventListener('click', async function () {
+            const json = await callApi('POST', '/broadcast/ping', {}, true);
+            if (json && json.job && json.job.id) {
+                if (wsJobIdInput) wsJobIdInput.value = json.job.id;
+                document.getElementById('audioJobId').value = json.job.id;
+                const channelName = 'private-audio-jobs.' + json.job.id;
+                const needSub = !pusherChannel || pusherChannel.name !== channelName;
+                if (needSub) {
+                    subscribePusher(json.job.id);
+                    // First event may fire before subscribe — ping again once connected.
+                    setTimeout(function () {
+                        callApi('POST', '/broadcast/ping', {}, true);
+                    }, 900);
+                }
+            }
+        });
+
+        // Keep WS job id in sync when analyze/create fills audioJobId
+        const _audioJobId = document.getElementById('audioJobId');
+        if (_audioJobId && wsJobIdInput) {
+            const sync = function () {
+                if (_audioJobId.value && !wsJobIdInput.value) {
+                    wsJobIdInput.value = _audioJobId.value;
+                }
+            };
+            _audioJobId.addEventListener('change', sync);
+        }
 
         function responseText() {
             return (responseBox.textContent || '').trim() || '{}';

@@ -153,6 +153,21 @@
                     <button type="button" class="btn secondary" id="btnAudioResult">GET result</button>
                 </div>
             </div>
+
+            <div class="card">
+                <h2>WebSocket (Pusher)</h2>
+                <p class="sub">Sandbox: subscreve o canal do job e recebe eventos sem poll.</p>
+                <div class="field">
+                    <label for="wsJobId">Job ID (canal private-audio-jobs.{id})</label>
+                    <input id="wsJobId" type="text" placeholder="cola um Job ID ou usa Ping" value="">
+                </div>
+                <div class="pg-actions">
+                    <button type="button" class="btn" id="btnWsSubscribe">Subscrever</button>
+                    <button type="button" class="btn secondary" id="btnWsUnsubscribe">Parar</button>
+                    <button type="button" class="btn secondary" id="btnWsPing">POST /broadcast/ping</button>
+                </div>
+                <p class="sub" id="wsStatus" style="margin-top:8px;">WS: desligado</p>
+            </div>
         </div>
     </section>
 
@@ -200,5 +215,19 @@
         'copyFailed' => 'Não foi possível copiar.',
         'saved' => 'JSON guardado.',
         'nothingToSave' => 'Nada para guardar.',
+        'wsNeedJobId' => 'Indica um Job ID para subscrever.',
+        'wsDisconnected' => 'WS: desligado',
+        'wsConnecting' => 'WS: a ligar…',
+        'wsSubscribed' => 'WS: subscrito',
+        'wsError' => 'WS: erro',
+        'wsEvent' => 'Evento WS recebido',
+        'pusherMissing' => 'Pusher key em falta no .env (PUSHER_APP_KEY).',
+    ],
+    'pusher' => [
+        'key' => config('broadcasting.connections.pusher.key'),
+        'cluster' => config('broadcasting.connections.pusher.options.cluster', 'eu'),
+        'authEndpoint' => url('/api/broadcasting/auth'),
+        'enabled' => config('broadcasting.default') === 'pusher'
+            && filled(config('broadcasting.connections.pusher.key')),
     ],
 ])

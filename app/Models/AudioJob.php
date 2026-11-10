@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use App\Events\AudioJobStatusUpdated;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class AudioJob extends Model
@@ -66,6 +68,32 @@ class AudioJob extends Model
         static::creating(function (AudioJob $job) {
             if (empty($job->uuid)) {
                 $job->uuid = (string) Str::uuid();
+            }
+        });
+
+        static::created(function (AudioJob $job) {
+            try {
+                broadcast(new AudioJobStatusUpdated($job));
+            } catch (\Throwable $e) {
+                Log::warning('AudioJob broadcast failed (created)', [
+                    'uuid' => $job->uuid,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        });
+
+        static::updated(function (AudioJob $job) {
+            if (! $job->wasChanged(['status', 'progress', 'message', 'task_state', 'error'])) {
+                return;
+            }
+
+            try {
+                broadcast(new AudioJobStatusUpdated($job->fresh() ?? $job));
+            } catch (\Throwable $e) {
+                Log::warning('AudioJob broadcast failed (updated)', [
+                    'uuid' => $job->uuid,
+                    'error' => $e->getMessage(),
+                ]);
             }
         });
     }
